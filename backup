@@ -1,0 +1,278 @@
+#!/usr/bin/env python
+"""
+A script for making incremental snapshot backups of directories using rsync,
+inspired by Michael Jakl's "Time Machine for every Unix out there":
+
+	<http://blog.interlinked.org/tutorials/rsync_time_machine.html>  
+	<http://blog.interlinked.org/tutorials/rsync_addendum.yaml.html>
+
+Advantages
+----------
+
++	Super simple to use, just type: backup SRC DEST.
++	Supports local and remote SRC and DEST.
++	It's just a simple wrapper for the standard rsync command, so it's very
+	reliable and works almost anywhere.
++	Each new snapshot contains a complete copy of the SRC dir.
++	But because hard-links are used, the bandwidth and storage space used by
+	each new snapshot is only the size of the files changed since the last snapshot
+	(the bandwidth even less, since compression is used).
++	Super simple restore: just copy files back from snapshot directories.
++	Interrupted backup commands will be resumed if you just run the same
+	command again.
++	You can specify patterns for files to exclude from the snapshots.
++	Prints out progress as snapshots are made, prints out an itemized
+	change-summary suitable for redirecting to a log file.
+
+Disadvantages
+-------------
+
+-	Does not compress snapshots.
+	You could use a compression tool compress old snapshots afterwards, but the
+	latest snapshot has to be left uncompressed.
+-	Does not encrypt snapshots.
+	You could use an encrypted filesystem for DEST and get encryption that way.
+-	Does not do deduplication.
+
+Usage
+-----
+
+	backup [options] SRC DEST
+
+Makes a snapshot backup of SRC inside DEST. Running the same backup command
+repeatedly creates incremental, snapshot backups of SRC inside DEST:
+
+	DEST/
+		latest.snapshot/
+		2011-04-03T23_55_37.snapshot/
+		2011-03-03T23_36_50.snapshot/
+		2011-02-03T23_35_13.snapshot/
+		.
+		.
+		.
+
+latest.snapshot is a symlink to the most recent snapshot directory, in this
+case 2011-04-03T23_55_37.snapshot.
+
+Each snapshot directory contains a complete copy of the SRC directory. To save
+bandwidth and storage space, when a new snapshot is made files in the new
+snapshot directory that have not changed since the previous snapshot are
+hard-linked to their counterparts in previous snapshot directory (this is
+achieved using rsync's --link-dest option).
+
+Because hard-links are used, older snapshots (or selected files within older
+snapshots) can be safely deleted without affecting newer snapshots.
+
+To restore selected files just copy them back from a snapshot to the live
+system. To restore an entire snapshot just copy the entire snapshot directory
+back to the live system.
+
+Either SRC or DEST (but not both) can be a remote directory, like:
+
+	you@yourdomain.org:/path/to/snapshots
+
+If a backup command is interrupted the transferred files will be stored in an
+incomplete.snapshot directory in DEST, and the backup can be resumed by running
+the same command again. The incomplete.snapshot directory contains only those
+files that were completely transferred, partially transferred files will be
+left in a partially_transferred_files directory in DEST.
+
+To exclude files from being backed up list them in a file at
+$HOME/.backup/excludes on the machine that is running the backup command, one
+rsync exclude pattern per line.
+
+Example Commands
+----------------
+
+Backup a local directory to a local directory:
+
+	backup Mail Mail.snapshots
+
+Backup a local directory to a local external drive:
+
+	backup Music /media/BACKUP/Music.snapshots
+
+Backup your entire home directory to an external drive:
+
+	backup ~ /media/SNAPSHOTS
+
+Backup a local directory to a remote directory:
+
+	backup Documents seanh@mydomain.org:Snapshots/Documents
+
+Backup a remote directory to a local directory:
+
+	backup seanh@mydomain.org:Documents Snapshots/Documents
+
+Make a local backup of your SDF homedir:
+
+	backup you@sdf.lonestar.org Snapshots/sdf.lonestar.org
+
+Options
+-------
+
+-d, --debug, -n, --dry-run
+	Perform a trial-run with no changes made, pass the --dry-run option to
+	rsync.
+
+TODO
+----
+
+Backup multiple sources to one dest: backup SRC1 SRC2 SRC3 ... DEST.
+Just pass all the sources and then the dest to the rsync command.
+
+Specify multiple --link-dest arguments (one for every snapshot directory in
+DEST) to save bandwidth/storage?
+
+Store log files in DEST dirs. If DEST is local you can simply redirect rsync's
+output. If it's remote, you would have to log to a temporary file then scp the
+temp file to DEST.
+
+Default SRC and DEST dirs? So you can just do `backup SRC` or just
+`backup`.
+
+How-to for encrypting and compressing backup dirs.
+
+"""
+import datetime
+import sys
+import os
+import logging
+import subprocess
+
+def is_remote(arg):
+	"""Return True if the given SRC or DEST argument specifies a remote path,
+	False if it specifies a local path.
+
+	"""
+	# If it has a : before the first / then it's a remote path.
+	return ':' in arg.split('/')[0]
+
+def parse_rsync_arg(arg):
+	"""Parse the given SRC or DEST argument and return tuple containing its
+	user, host and path parts:
+
+	user	:	The username in a remote path spec.
+				'seanh' in 'seanh@mydomain.org:/path/to/backups'.
+				None if arg is a local path or a remote path without a
+				username.
+	host	:	The hostname in a remote path spec.
+				'mydomain.org' in 'seanh@mydomain.org:/path/to/backups'.
+				None if arg is a local path.
+	path	:	The path in a local or remote path spec.
+				'/path/to/backups' in the remote path 'seanh@mydomain.org:/path/to/backups'.
+				'/media/BACKUP' in the local path '/media/BACKUP'.
+
+	"""
+	logger = logging.getLogger("backup.parse_rsync_arg")
+	logger.debug("Parsing rsync arg %s" % arg)
+	parts = {}
+	if is_remote(arg):
+		logger.debug("This is a remote path")
+		before_first_colon, after_first_colon = arg.split(':',1)
+		if '@' in before_first_colon:
+			logger.debug("User is specified in the path")
+			user = before_first_colon.split('@')[0]
+		else:
+			logger.debug("User is not specified in the path")
+			user = None
+		host = before_first_colon.split('@')[-1]
+		path = after_first_colon
+	else:
+		logger.debug("This is a local path.")
+		user = None
+		host = None
+		path = os.path.abspath(os.path.expanduser(arg))
+	logger.debug("User: %s" % user)
+	logger.debug("Host: %s" % host)
+	logger.debug("Path: %s" % path)
+	return user,host,path
+
+def main(SRC,DEST,debug):
+	logger = logging.getLogger("backup.main")
+
+	if debug:
+		logging.basicConfig(level=logging.DEBUG)
+
+	# Make sure SRC ends with / because this affects how rsync behaves.
+	if not SRC.endswith(os.sep):
+		SRC += os.sep
+
+	logger.debug("SRC is: %s" % SRC)
+	logger.debug("DEST is: %s" % DEST)
+
+	date = datetime.datetime.now().strftime("%Y-%m-%dT%H_%M_%S")
+	logger.debug("date is: %s" % date)
+
+	user,host,snapshots_root = parse_rsync_arg(DEST)
+
+	# Construct the list of options to be passed to rsync.
+	rsync_options = ['--archive', # Copy recursively and preserve times, permissions, symlinks, etc.
+		'--compress', # Compress files during transfer
+		'--partial',
+		'--partial-dir=partially_transferred_files', # Keep partially transferred files if the transfer is interrupted
+		'--progress', # Print progress while transferring files
+		'--one-file-system', # Don't cross filesystem boundaries
+		'--delete', # Delete extraneous files from dest dirs
+		'--delete-excluded', # Also delete excluded files from dest dirs
+		'--itemize-changes', # Output a change-summary for all updates
+		'--link-dest=../latest.snapshot', # Make hard-links to the previous snapshot, if any
+		'--fuzzy', # Look for basis files for any destination files that are missing
+		'--human-readable', # Output numbers in a human-readable format
+		# '-F', # Enable per-directory .rsync-filter files.
+		]
+	if os.path.isfile(os.path.expanduser("~/.backup/excludes")):
+		rsync_options.append('--exclude-from=$HOME/.backup/excludes') # Read exclude patterns from file
+	if debug:
+		rsync_options.append('--dry-run')
+
+	# Construct the rsync command.
+	rsync_cmd = "rsync %s %s " % (' '.join(rsync_options),SRC)
+	if host is not None:
+		if user is not None:
+			rsync_cmd += "%s@" % user
+		rsync_cmd += "%s:" % host
+	rsync_cmd += "%s/incomplete.snapshot" % snapshots_root
+
+	# Construct the `mv && rm && ln` command to be executed after the rsync
+	# command completes successfully.
+	mv_cmd = ""
+	if host is not None:
+		mv_cmd += "ssh "
+		if user is not None:
+			mv_cmd += "%s@" % user
+		mv_cmd += '%s "' % host
+	mv_cmd += "mv %s/incomplete.snapshot %s/%s.snapshot " % (snapshots_root,snapshots_root,date)	
+	mv_cmd += "&& rm -f %s/latest.snapshot " % snapshots_root
+	mv_cmd += "&& ln -s %s.snapshot %s/latest.snapshot" % (date,snapshots_root)
+	if host is not None:
+		mv_cmd += '"'
+	
+	print rsync_cmd
+	exit_status = subprocess.call(rsync_cmd, shell=True)
+	if exit_status != 0:
+		sys.exit(exit_status)
+	
+	if not debug:
+		print mv_cmd
+		exit_status = subprocess.call(mv_cmd, shell=True)
+		if exit_status != 0:
+			sys.exit(exit_status)
+
+if __name__ == "__main__":
+	usage = "Usage: %s [options] SRC DEST" % sys.argv[0]
+	SRC = None
+	DEST = None
+	debug = False
+	for item in sys.argv[1:]:
+		if item in ('-d','--debug','-n','--dry-run'):
+			debug = True
+		elif SRC is None:
+			SRC = item
+		elif DEST is None:
+			DEST = item
+		else:
+			sys.exit(usage)
+	if SRC is None or DEST is None:
+		sys.exit(usage)
+	main(SRC,DEST,debug)
