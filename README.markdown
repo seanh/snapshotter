@@ -4,6 +4,20 @@ inspired by Michael Jakl's "Time Machine for every Unix out there":
 <http://blog.interlinked.org/tutorials/rsync_time_machine.html>  
 <http://blog.interlinked.org/tutorials/rsync_addendum.yaml.html>
 
+I wanted a simple-as-possible `backup SRC DEST` command that I could use
+to backup any local or remote SRC directory to any local or remote DEST
+directory, either from the command-line or from cron, that would make
+simple snapshot incremental backups and not require any configuration,
+or any command-line options or tricky arguments to remember. It needs to
+be as simple as possible so that I can use it without thinking,
+otherwise it won't get used.
+
+Michael Jakl's shell script was just a little too simple to be useful. I
+needed the script to accept SRC and DEST as command-line arguments, and
+to automagically figure out whether SRC and DEST are local or remote and
+behave accordingly. My Bourne shell scripting ability was not up to the
+task, so I wrote it in Python instead.
+
 `backup` is just a simple wrapper script for the rsync command, so it's very
 reliable and works almost anywhere.
 
