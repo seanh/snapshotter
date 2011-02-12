@@ -1,8 +1,8 @@
 A script for making incremental snapshot backups of directories using rsync,
 inspired by Michael Jakl's "Time Machine for every Unix out there":
 
-	<http://blog.interlinked.org/tutorials/rsync_time_machine.html>  
-	<http://blog.interlinked.org/tutorials/rsync_addendum.yaml.html>
+<http://blog.interlinked.org/tutorials/rsync_time_machine.html>  
+<http://blog.interlinked.org/tutorials/rsync_addendum.yaml.html>
 
 `backup` is just a simple wrapper script for the rsync command, so it's very
 reliable and works almost anywhere.
@@ -37,16 +37,19 @@ snapshot, not the files or directories that the symlinks refer to.
 Progress is printed to stdout as snapshots are made, and an itemized
 change-summary is printed, suitable for redirecting to a log file.
 
-To restore selected files just copy them back from a snapshot to the live
-system. To restore an entire snapshot just copy the entire snapshot directory
-back to the live system.
+To restore selected files just copy them back from a snapshot directory to the
+live system. To restore an entire snapshot just copy the entire snapshot
+directory back to the live system.
+
+Old snapshots (or selected files within old snapshots) can be deleted without
+affecting newer snapshots.
 
 Either SRC or DEST (but not both) can be a remote directory, e.g.:
 `you@yourdomain.org:/path/to/snapshots`.
 
 If a backup command is interrupted the transferred files will be stored in an
-incomplete.snapshot directory in DEST, and the backup can be resumed by running
-the same command again.
+`incomplete.snapshot` directory in DEST, and the backup can be resumed by
+running the same command again.
 
 To exclude files from being backed up list them in a file at
 `$HOME/.backup/excludes` on the machine that is running the backup command, one
@@ -98,7 +101,7 @@ Disadvantages
 -------------
 
 -	Does not compress snapshots.
-	You could use a compression tool compress old snapshots afterwards, but the
+	You could use a compression tool to compress old snapshots afterwards, but the
 	latest snapshot has to be left uncompressed so that it can be compared to
 	the current SRC directory when making the next snapshot.
 -	Does not encrypt snapshots.
@@ -143,9 +146,8 @@ Make a local backup of your SDF homedir:
 Options
 -------
 
--d, --debug, -n, --dry-run
-	Perform a trial-run with no changes made, pass the --dry-run option to
-	rsync.
+`-d` or `--debug` or `-n` or `--dry-run`  
+Perform a trial-run with no changes made, passes the `--dry-run` option to rsync.
 
 TODO
 ----
