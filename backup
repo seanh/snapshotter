@@ -58,10 +58,10 @@ def parse_rsync_arg(arg):
 	logger.debug("Path: %s" % path)
 	return user,host,path
 
-def main(SRC,DEST,debug):
+def main(SRC,DEST,options):
 	logger = logging.getLogger("backup.main")
 
-	if debug:
+	if options.debug:
 		logging.basicConfig(level=logging.DEBUG)
 
 	# Make sure SRC ends with / because this affects how rsync behaves.
@@ -78,23 +78,29 @@ def main(SRC,DEST,debug):
 
 	# Construct the list of options to be passed to rsync.
 	rsync_options = ['--archive', # Copy recursively and preserve times, permissions, symlinks, etc.
-		'--compress', # Compress files during transfer
 		'--partial',
 		'--partial-dir=partially_transferred_files', # Keep partially transferred files if the transfer is interrupted
-		'--progress', # Print progress while transferring files
 		'--one-file-system', # Don't cross filesystem boundaries
 		'--delete', # Delete extraneous files from dest dirs
 		'--delete-excluded', # Also delete excluded files from dest dirs
 		'--itemize-changes', # Output a change-summary for all updates
 		'--link-dest=../latest.snapshot', # Make hard-links to the previous snapshot, if any
-		'--fuzzy', # Look for basis files for any destination files that are missing
 		'--human-readable', # Output numbers in a human-readable format
 		# '-F', # Enable per-directory .rsync-filter files.
 		]
+	if options.compress:
+		rsync_options.append('--compress') # Compress files during transfer
+	if options.fuzzy:
+		rsync_options.append('--fuzzy') # Look for basis files for any destination files that are missing
+	if options.progress:
+		rsync_options.append('--progress') # Print progress while transferring files
 	if os.path.isfile(os.path.expanduser("~/.backup/excludes")):
 		rsync_options.append('--exclude-from=$HOME/.backup/excludes') # Read exclude patterns from file
-	if debug:
+	if options.debug:
 		rsync_options.append('--dry-run')
+	if options.exclude is not None:
+		for pattern in options.exclude:
+			rsync_options.append("--exclude '%s'" % pattern)
 
 	# Construct the rsync command.
 	rsync_cmd = "rsync %s %s " % (' '.join(rsync_options),SRC)
@@ -123,26 +129,29 @@ def main(SRC,DEST,debug):
 	if exit_status != 0:
 		sys.exit(exit_status)
 	
-	if not debug:
+	if not options.debug:
 		print mv_cmd
 		exit_status = subprocess.call(mv_cmd, shell=True)
 		if exit_status != 0:
 			sys.exit(exit_status)
 
 if __name__ == "__main__":
-	usage = "Usage: %s [options] SRC DEST" % sys.argv[0]
-	SRC = None
-	DEST = None
-	debug = False
-	for item in sys.argv[1:]:
-		if item in ('-d','--debug','-n','--dry-run'):
-			debug = True
-		elif SRC is None:
-			SRC = item
-		elif DEST is None:
-			DEST = item
-		else:
-			sys.exit(usage)
-	if SRC is None or DEST is None:
-		sys.exit(usage)
-	main(SRC,DEST,debug)
+	from optparse import OptionParser
+	parser = OptionParser(usage="usage: %prog [options] SRC DEST")
+	parser.add_option('-d','--debug','-n','--dry-run', dest='debug', action='store_true', default=False,
+			help='Perform a trial-run with no changes made (pass the --dry-run option to rsync)')
+	parser.add_option('--no-compress', dest='compress', action='store_false', default=True,
+			help='Do not compress file data during transfer (do not pass the --compress argument to rsync)')
+	parser.add_option('--no-fuzzy', dest='fuzzy', action='store_false', default=True,
+			help='Do not look for basis files for destination files that are missing (do not pass the --fuzzy argument to rsync)')
+	parser.add_option('--no-progress', dest='progress', action='store_false', default=True,
+			help='Do not show progress during transfer (do not pass the --progress argument to rsync)')
+	parser.add_option('--exclude', type='string', dest='exclude', metavar="PATTERN",  action='append',
+			help="Exclude files matching PATTERN, e.g. --exclude '.git/*' (see the --exclude option in `man rsync`)")
+	(options,args) = parser.parse_args()
+
+	if len(args) != 2:
+		sys.exit(parser.get_usage())
+	SRC = args[0]
+	DEST = args[1]
+	main(SRC,DEST,options)
