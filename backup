@@ -103,7 +103,7 @@ def main(SRC,DEST,options):
 			rsync_options.append("--exclude '%s'" % pattern)
 
 	# Construct the rsync command.
-	rsync_cmd = "rsync %s %s " % (' '.join(rsync_options),SRC)
+	rsync_cmd = "rsync %s '%s' " % (' '.join(rsync_options),SRC)
 	if host is not None:
 		if user is not None:
 			rsync_cmd += "%s@" % user
