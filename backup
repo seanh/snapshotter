@@ -86,6 +86,7 @@ def main(SRC,DEST,options):
 		'--itemize-changes', # Output a change-summary for all updates
 		'--link-dest=../latest.snapshot', # Make hard-links to the previous snapshot, if any
 		'--human-readable', # Output numbers in a human-readable format
+		'--quiet', # Suppress non-error output messages
 		# '-F', # Enable per-directory .rsync-filter files.
 		]
 	if options.compress:
