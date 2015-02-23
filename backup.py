@@ -9,6 +9,7 @@ import sys
 import os
 import logging
 import subprocess
+from optparse import OptionParser
 
 
 def _datetime():
@@ -69,7 +70,7 @@ def parse_rsync_arg(arg):
     logger.debug("Path: %s" % path)
     return user,host,path
 
-def main(SRC, DEST, debug, compress, fuzzy, progress, debug):
+def backup(SRC, DEST, debug, compress, fuzzy, progress, debug):
     logger = logging.getLogger("backup.main")
 
     if debug:
@@ -147,24 +148,47 @@ def main(SRC, DEST, debug, compress, fuzzy, progress, debug):
         if exit_status != 0:
             sys.exit(exit_status)
 
-if __name__ == "__main__":
-    from optparse import OptionParser
+
+def parse_cli():
+    """Parse the command-line arguments."""
     parser = OptionParser(usage="usage: %prog [options] SRC DEST")
-    parser.add_option('-d','--debug','-n','--dry-run', dest='debug', action='store_true', default=False,
-        help='Perform a trial-run with no changes made (pass the --dry-run option to rsync)')
-    parser.add_option('--no-compress', dest='compress', action='store_false', default=True,
-        help='Do not compress file data during transfer (do not pass the --compress argument to rsync)')
-    parser.add_option('--no-fuzzy', dest='fuzzy', action='store_false', default=True,
-        help='Do not look for basis files for destination files that are missing (do not pass the --fuzzy argument to rsync)')
-    parser.add_option('--no-progress', dest='progress', action='store_false', default=True,
-        help='Do not show progress during transfer (do not pass the --progress argument to rsync)')
-    parser.add_option('--exclude', type='string', dest='exclude', metavar="PATTERN",  action='append',
-        help="Exclude files matching PATTERN, e.g. --exclude '.git/*' (see the --exclude option in `man rsync`)")
-    (options,args) = parser.parse_args()
+    parser.add_option(
+        '-d', '--debug', '-n', '--dry-run', dest='debug', action='store_true',
+        default=False,
+        help="Perform a trial-run with no changes made (pass the --dry-run "
+             "option to rsync)")
+    parser.add_option(
+        '--no-compress', dest='compress', action='store_false', default=True,
+        help="Do not compress file data during transfer (do not pass the "
+             "--compress argument to rsync)")
+    parser.add_option(
+        '--no-fuzzy', dest='fuzzy', action='store_false', default=True,
+        help="Do not look for basis files for destination files that are "
+             "missing (do not pass the --fuzzy argument to rsync)")
+    parser.add_option(
+        '--no-progress', dest='progress', action='store_false', default=True,
+        help="Do not show progress during transfer (do not pass the "
+             "--progress argument to rsync)")
+    parser.add_option(
+        '--exclude', type='string', dest='exclude', metavar="PATTERN",
+        action='append',
+        help="Exclude files matching PATTERN, e.g. --exclude '.git/*' (see "
+             "the --exclude option in `man rsync`)")
+    (options, args) = parser.parse_args()
 
     if len(args) != 2:
         sys.exit(parser.get_usage())
-    SRC = args[0]
-    DEST = args[1]
-    main(SRC, DEST, options.debug, options.compress, options.fuzzy,
-         options.progress, options.exclude)
+
+    src = args[0]
+    dest = args[1]
+    return (src, dest, options.debug, options.compress, options.fuzzy,
+            options.progress, options.exclude)
+
+
+def main():
+    src, dest, debug, compress, fuzzy, progress, exclude = parse_cli()
+    backup(src, dest, debug, compress, fuzzy, progress, exclude)
+
+
+if __name__ == "__main__":
+    main()
