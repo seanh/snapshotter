@@ -69,10 +69,10 @@ def parse_rsync_arg(arg):
     logger.debug("Path: %s" % path)
     return user,host,path
 
-def main(SRC,DEST,options):
+def main(SRC, DEST, debug, compress, fuzzy, progress, debug):
     logger = logging.getLogger("backup.main")
 
-    if options.debug:
+    if debug:
         logging.basicConfig(level=logging.DEBUG)
 
     # Make sure SRC ends with / because this affects how rsync behaves.
@@ -100,18 +100,18 @@ def main(SRC,DEST,options):
         '--quiet', # Suppress non-error output messages
         # '-F', # Enable per-directory .rsync-filter files.
         ]
-    if options.compress:
+    if compress:
         rsync_options.append('--compress') # Compress files during transfer
-    if options.fuzzy:
+    if fuzzy:
         rsync_options.append('--fuzzy') # Look for basis files for any destination files that are missing
-    if options.progress:
+    if progress:
         rsync_options.append('--progress') # Print progress while transferring files
     if os.path.isfile(os.path.expanduser("~/.backup/excludes")):
         rsync_options.append('--exclude-from=$HOME/.backup/excludes') # Read exclude patterns from file
-    if options.debug:
+    if debug:
         rsync_options.append('--dry-run')
-    if options.exclude is not None:
-        for pattern in options.exclude:
+    if exclude is not None:
+        for pattern in exclude:
             rsync_options.append("--exclude '%s'" % pattern)
 
     # Construct the rsync command.
@@ -141,7 +141,7 @@ def main(SRC,DEST,options):
     if exit_status != 0:
         sys.exit(exit_status)
 
-    if not options.debug:
+    if not debug:
         print mv_cmd
         exit_status = subprocess.call(mv_cmd, shell=True)
         if exit_status != 0:
@@ -166,4 +166,5 @@ if __name__ == "__main__":
         sys.exit(parser.get_usage())
     SRC = args[0]
     DEST = args[1]
-    main(SRC,DEST,options)
+    main(SRC, DEST, options.debug, options.compress, options.fuzzy,
+         options.progress, options.exclude)
