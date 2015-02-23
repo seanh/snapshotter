@@ -10,6 +10,17 @@ import os
 import logging
 import subprocess
 
+
+def _datetime():
+    """Return the current datetime as a string.
+
+    We wrap datetime.datetime.now() instead of calling it directly to make
+    it easy for tests to patch it.
+
+    """
+    return datetime.datetime.now().strftime("%Y-%m-%dT%H_%M_%S")
+
+
 def is_remote(arg):
     """Return True if the given SRC or DEST argument specifies a remote path,
     False if it specifies a local path.
@@ -71,7 +82,7 @@ def main(SRC,DEST,options):
     logger.debug("SRC is: %s" % SRC)
     logger.debug("DEST is: %s" % DEST)
 
-    date = datetime.datetime.now().strftime("%Y-%m-%dT%H_%M_%S")
+    date = _datetime()
     logger.debug("date is: %s" % date)
 
     user,host,snapshots_root = parse_rsync_arg(DEST)
