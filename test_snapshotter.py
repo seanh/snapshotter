@@ -6,7 +6,7 @@ import shutil
 import mock
 import nose.tools
 
-import backup
+import snapshotter
 
 
 def _this_directory():
@@ -20,16 +20,17 @@ class TestCLI(object):
 
     def test_with_no_src_or_dest_args(self):
         nose.tools.assert_raises(
-            backup.CommandLineArgumentsError, backup.parse_cli, args=[])
+            snapshotter.CommandLineArgumentsError, snapshotter.parse_cli,
+            args=[])
 
     def test_with_no_dest_arg(self):
         nose.tools.assert_raises(
-            backup.CommandLineArgumentsError, backup.parse_cli,
+            snapshotter.CommandLineArgumentsError, snapshotter.parse_cli,
             args=["/home/fred"])
 
     def test_with_default_options(self):
         src, dest, debug, compress, fuzzy, progress, exclude = (
-            backup.parse_cli(args=["/home/fred", "/media/backup"]))
+            snapshotter.parse_cli(args=["/home/fred", "/media/backup"]))
         assert src == "/home/fred"
         assert dest == "/media/backup"
         assert debug is False
@@ -40,7 +41,7 @@ class TestCLI(object):
 
     def test_dry_run(self):
         for option in ("-n", "--dry-run"):
-            _, _, debug, _, _, _, _ = backup.parse_cli(
+            _, _, debug, _, _, _, _ = snapshotter.parse_cli(
                 args=[option, "/home/fred", "/media/backup"])
             assert debug is True
 
@@ -63,7 +64,7 @@ class TestFunctional(object):
 
     """Functional tests that actually run rsync and other commands."""
 
-    @mock.patch("backup._datetime")
+    @mock.patch("snapshotter._datetime")
     def test_functional(self, mock_datetime_function):
         """One functional test that actually calls rsync and copies files."""
         datetime = "2015-02-23T18_58_02"
@@ -73,7 +74,7 @@ class TestFunctional(object):
             dest = tempfile.mkdtemp()
             src = os.path.join(_this_directory(), "test_data")
 
-            backup.backup(src, dest)
+            snapshotter.snapshot(src, dest)
 
             snapshot_dir = os.path.join(dest, datetime + ".snapshot")
             assert os.path.isdir(snapshot_dir)
@@ -96,17 +97,17 @@ def _get_args(call_args):
     return positional_args[0]
 
 
-class TestBackup(object):
+class TestSnapshot(object):
 
-    """Tests for the backup() function."""
+    """Tests for the snapshot() function."""
 
     def setup(self):
         """Patch the _run() and _datetime() functions."""
-        self.run_patcher = mock.patch('backup._run')
+        self.run_patcher = mock.patch('snapshotter._run')
         self.mock_run_function = self.run_patcher.start()
         self.mock_run_function.return_value = 0
 
-        self.datetime_patcher = mock.patch('backup._datetime')
+        self.datetime_patcher = mock.patch('snapshotter._datetime')
         self.mock_datetime_function = self.datetime_patcher.start()
         self.datetime = "2015-02-23T18_58_02"
         self.mock_datetime_function.return_value = self.datetime
@@ -116,25 +117,25 @@ class TestBackup(object):
         self.datetime_patcher.stop()
 
     def test_passing_dry_run_to_rsync(self):
-        """backup should pass -n/--dry-run on to rsync."""
+        """snapshot() should pass -n/--dry-run on to rsync."""
         src = "/home/fred"
         dst = "/media/backup"
 
-        backup.backup(src, dst, debug=True)
+        snapshotter.snapshot(src, dst, debug=True)
 
         assert self.mock_run_function.call_count == 1, (
-            "When backup is given the -n/--dry-run arg it should only run "
+            "When snapshot() is given the -n/--dry-run arg it should only run "
             "one command (rsync) - the mv command shouldn't be run")
         args = _get_args(self.mock_run_function.call_args)
         assert "--dry-run" in args, (
-            "backup should pass the -n/--dry-run argument on to rsync")
+            "snapshot() should pass the -n/--dry-run argument on to rsync")
 
     def test_not_passing_dry_run_to_rsync(self):
-        """If --n isn't given to backup it shouldn't be given to rsync."""
+        """If --n isn't given to snapshotter it shouldn't be given to rsync."""
         src = "/home/fred"
         dst = "/media/backup"
 
-        backup.backup(src, dst, debug=False)
+        snapshotter.snapshot(src, dst, debug=False)
 
         assert self.mock_run_function.call_count == 2, (
             "Both the rsync and mv commands should be run")
@@ -146,7 +147,7 @@ class TestBackup(object):
         src = "/home/fred"  # No trailing slash.
         dst = "/media/backup"
 
-        backup.backup(src, dst)
+        snapshotter.snapshot(src, dst)
 
         args = _get_args(self.mock_run_function.call_args_list[0])
         assert "/home/fred/" in args
@@ -156,21 +157,21 @@ class TestBackup(object):
         src = "/home/fred/"  # Trailing slash.
         dst = "/media/backup"
 
-        backup.backup(src, dst)
+        snapshotter.snapshot(src, dst)
 
         args = _get_args(self.mock_run_function.call_args_list[0])
         assert "/home/fred/" in args
 
     def test_rsync_error(self):
-        """backup() should raise RsyncError if rsync exits with non-zero."""
+        """snapshot() should raise RsyncError if rsync exits with non-zero."""
         self.mock_run_function.return_value = 11
         src = "/home/fred"
         dst = "/media/backup"
 
         try:
-            backup.backup(src, dst, debug=True)
-            assert False, "backup() should have raised an exception"
-        except backup.RsyncError as err:
+            snapshotter.snapshot(src, dst, debug=True)
+            assert False, "snapshot() should have raised an exception"
+        except snapshotter.RsyncError as err:
             assert err.message == 11
 
     def test_link_dest(self):
@@ -178,7 +179,7 @@ class TestBackup(object):
         src = "/home/fred"
         dst = "/media/backup"
 
-        backup.backup(src, dst)
+        snapshotter.snapshot(src, dst)
 
         args = _get_args(self.mock_run_function.call_args_list[0])
         link_dest_args = [
@@ -193,7 +194,7 @@ class TestBackup(object):
         src = "Mail"
         dst = "Mail.snapshots"
 
-        backup.backup(src, dst)
+        snapshotter.snapshot(src, dst)
 
         args = _get_args(self.mock_run_function.call_args_list[0])
         src_arg = args.split()[-2]
@@ -207,7 +208,7 @@ class TestBackup(object):
         src = "Music"
         dst = "/media/backup/Music.snapshots"
 
-        backup.backup(src, dst)
+        snapshotter.snapshot(src, dst)
 
         args = _get_args(self.mock_run_function.call_args_list[0])
         src_arg = args.split()[-2]
@@ -220,7 +221,7 @@ class TestBackup(object):
         src = "~"
         dst = "/media/SNAPSHOTS"
 
-        backup.backup(src, dst)
+        snapshotter.snapshot(src, dst)
 
         args = _get_args(self.mock_run_function.call_args_list[0])
         src_arg = args.split()[-2]
@@ -232,7 +233,7 @@ class TestBackup(object):
         src = "/"
         dst = "/media/SNAPSHOTS"
 
-        backup.backup(src, dst)
+        snapshotter.snapshot(src, dst)
 
         args = _get_args(self.mock_run_function.call_args_list[0])
         src_arg = args.split()[-2]
@@ -244,7 +245,7 @@ class TestBackup(object):
         src = "Documents"
         dst = "seanh@mydomain.org:Snapshots/Documents"
 
-        backup.backup(src, dst)
+        snapshotter.snapshot(src, dst)
 
         expected_destination = os.path.join(dst, "incomplete.snapshot")
         args = _get_args(self.mock_run_function.call_args_list[0])
@@ -255,7 +256,7 @@ class TestBackup(object):
         src = "seanh@mydomain.org:Documents"
         dst = "Snapshots/Documents"
 
-        backup.backup(src, dst)
+        snapshotter.snapshot(src, dst)
 
         args = _get_args(self.mock_run_function.call_args_list[0])
         src_arg = args.split()[-2]
@@ -265,7 +266,7 @@ class TestBackup(object):
         src = "Mail"
         dst = "Mail.snapshots"
 
-        backup.backup(src, dst)
+        snapshotter.snapshot(src, dst)
 
         args = _get_args(self.mock_run_function.call_args_list[1])
         mv, rm, ln = [arg.strip() for arg in args.split('&&')]
@@ -295,7 +296,7 @@ class TestBackup(object):
         src = "Mail"
         dst = "you@yourdomain.org:/path/to/snapshots"
 
-        backup.backup(src, dst)
+        snapshotter.snapshot(src, dst)
 
         args = _get_args(self.mock_run_function.call_args_list[1])
 
@@ -315,7 +316,7 @@ class TestBackup(object):
         src = "Mail"
         dst = "yourdomain.org:/path/to/snapshots"
 
-        backup.backup(src, dst)
+        snapshotter.snapshot(src, dst)
 
         args = _get_args(self.mock_run_function.call_args_list[1])
 
@@ -332,7 +333,7 @@ class TestBackup(object):
         assert args == expected_args
 
     def test_mv_command_fails(self):
-        """backup() should raise if the mv command exits with non-zero."""
+        """snapshot() should raise if the mv command exits with non-zero."""
         src = "Mail"
         dst = "Mail.snapshots"
 
@@ -345,7 +346,7 @@ class TestBackup(object):
         self.mock_run_function.side_effect = _run
 
         try:
-            backup.backup(src, dst)
-            assert False, "backup() should have raised an exception"
-        except backup.MoveError as err:
+            snapshotter.snapshot(src, dst)
+            assert False, "snapshot() should have raised an exception"
+        except snapshotter.MoveError as err:
             assert err.message == 1

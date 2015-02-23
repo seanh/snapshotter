@@ -1,10 +1,13 @@
+Snapshotter
+===========
+
 A script for making incremental snapshot backups of directories using rsync,
 inspired by Michael Jakl's "Time Machine for every Unix out there":
 
 <http://blog.interlinked.org/tutorials/rsync_time_machine.html>  
 <http://blog.interlinked.org/tutorials/rsync_addendum.yaml.html>
 
-I wanted a simple-as-possible `backup SRC DEST` command that I could use
+I wanted a simple-as-possible `snapshotter SRC DEST` command that I could use
 to backup any local or remote SRC directory to any local or remote DEST
 directory, either from the command-line or from cron, that would make
 simple snapshot incremental backups and not require any configuration,
@@ -18,15 +21,15 @@ to automagically figure out whether SRC and DEST are local or remote and
 behave accordingly. My Bourne shell scripting ability was not up to the
 task, so I wrote it in Python instead.
 
-`backup` is just a simple wrapper script for the rsync command, so it's very
+Snapshotter is just a simple wrapper script for the rsync command, so it's very
 reliable and works almost anywhere.
 
 Usage
 -----
 
-	backup [options] SRC DEST
+	snapshotter [options] SRC DEST
 
-Makes a snapshot backup of SRC inside DEST. Running the same backup command
+Makes a snapshot backup of SRC inside DEST. Running the same snapshotter command
 repeatedly creates incremental, snapshot backups of SRC inside DEST:
 
 	DEST/
@@ -61,19 +64,19 @@ affecting newer snapshots.
 Either SRC or DEST (but not both) can be a remote directory, e.g.:
 `you@yourdomain.org:/path/to/snapshots`.
 
-If a backup command is interrupted the transferred files will be stored in an
+If a snapshotter command is interrupted the transferred files will be stored in an
 `incomplete.snapshot` directory in DEST, and the backup can be resumed by
 running the same command again.
 
 To exclude files from being backed up list them in a file at
-`$HOME/.backup/excludes` on the machine that is running the backup command, one
+`$HOME/.backup/excludes` on the machine that is running the snapshotter command, one
 rsync exclude pattern per line.
 
 Advantages
 ----------
 
 +	**Super simple backup.**
-	Just type: `backup SRC DEST`.
+	Just type: `snapshotter SRC DEST`.
 
 +	**Super simple restore.**
 	Just copy files back from snapshot directories.
@@ -85,7 +88,7 @@ Advantages
 	another remote directory).
 
 +	**Resumes interrupted backups.**
-    Just run the same backup command again.
+    Just run the same snapshotter command again.
 
 +	**You can specify exclude patterns** for files to be excluded from the
 	snapshots.
@@ -127,19 +130,19 @@ Example Commands
 
 Backup a local directory to a local directory:
 
-	backup Mail Mail.snapshots
+	snapshotter Mail Mail.snapshots
 
 Backup a local directory to a local external drive:
 
-	backup Music /media/BACKUP/Music.snapshots
+	snapshotter Music /media/BACKUP/Music.snapshots
 
 Backup your entire home directory to an external drive:
 
-	backup ~ /media/SNAPSHOTS
+	snapshotter ~ /media/SNAPSHOTS
 
 Backup your entire system to an external drive:
 
-	sudo backup / /media/SNAPSHOTS
+	sudo snapshotter / /media/SNAPSHOTS
 
 (Because the backup does not cross filesystem boundaries, this will not attempt
 to recursively backup /media/SNAPSHOTS into /media/SNAPSHOTS, but note that any
@@ -147,15 +150,15 @@ other mounted filesystems will not be backed up either.)
 
 Backup a local directory to a remote directory:
 
-	backup Documents seanh@mydomain.org:Snapshots/Documents
+	snapshotter Documents seanh@mydomain.org:Snapshots/Documents
 
 Backup a remote directory to a local directory:
 
-	backup seanh@mydomain.org:Documents Snapshots/Documents
+	snapshotter seanh@mydomain.org:Documents Snapshots/Documents
 
 Make a local backup of your SDF homedir:
 
-	backup you@sdf.lonestar.org Snapshots/sdf.lonestar.org
+	snapshotter you@sdf.lonestar.org Snapshots/sdf.lonestar.org
 
 Options
 -------
@@ -166,7 +169,7 @@ Perform a trial-run with no changes made, passes the `--dry-run` option to rsync
 TODO
 ----
 
-Backup multiple sources to one dest: backup SRC1 SRC2 SRC3 ... DEST.
+Backup multiple sources to one dest: snapshotter SRC1 SRC2 SRC3 ... DEST.
 Just pass all the sources and then the dest to the rsync command.
 
 Specify multiple --link-dest arguments (one for every snapshot directory in
@@ -176,7 +179,7 @@ Store log files in DEST dirs. If DEST is local you can simply redirect rsync's
 output. If it's remote, you would have to log to a temporary file then scp the
 temp file to DEST.
 
-Default SRC and DEST dirs? So you can just do `backup SRC` or just
-`backup`.
+Default SRC and DEST dirs? So you can just do `snapshotter SRC` or just
+`snapshotter`.
 
 How-to for encrypting and compressing backup dirs.

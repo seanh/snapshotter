@@ -56,7 +56,7 @@ def parse_rsync_arg(arg):
                             '/media/BACKUP' in the local path '/media/BACKUP'.
 
     """
-    logger = logging.getLogger("backup.parse_rsync_arg")
+    logger = logging.getLogger("snapshotter.parse_rsync_arg")
     logger.debug("Parsing rsync arg %s" % arg)
     parts = {}
     if is_remote(arg):
@@ -95,9 +95,9 @@ class MoveError(Exception):
     pass
 
 
-def backup(SRC, DEST, debug=False, compress=True, fuzzy=True, progress=True,
-           exclude=None):
-    logger = logging.getLogger("backup.main")
+def snapshot(SRC, DEST, debug=False, compress=True, fuzzy=True, progress=True,
+             exclude=None):
+    logger = logging.getLogger("snapshotter.snapshot")
 
     if debug:
         logging.basicConfig(level=logging.DEBUG)
@@ -133,8 +133,8 @@ def backup(SRC, DEST, debug=False, compress=True, fuzzy=True, progress=True,
         rsync_options.append('--fuzzy') # Look for basis files for any destination files that are missing
     if progress:
         rsync_options.append('--progress') # Print progress while transferring files
-    if os.path.isfile(os.path.expanduser("~/.backup/excludes")):
-        rsync_options.append('--exclude-from=$HOME/.backup/excludes') # Read exclude patterns from file
+    if os.path.isfile(os.path.expanduser("~/.snapshotter/excludes")):
+        rsync_options.append('--exclude-from=$HOME/.snapshotter/excludes') # Read exclude patterns from file
     if debug:
         rsync_options.append('--dry-run')
     if exclude is not None:
@@ -224,7 +224,7 @@ def main():
     except CommandLineArgumentsError as err:
         sys.exit(err.message)
     try:
-        backup(src, dest, debug, compress, fuzzy, progress, exclude)
+        snapshot(src, dest, debug, compress, fuzzy, progress, exclude)
     except (RsyncError, MoveError) as err:
         sys.exit(err.message)
 
