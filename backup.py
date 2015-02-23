@@ -12,6 +12,16 @@ import subprocess
 from optparse import OptionParser
 
 
+def _run(command):
+    """Run the given command as a subprocess.
+
+    We wrap subprocess.call() in our own function to make it easy for tests
+    to patch it.
+
+    """
+    return subprocess.call(command, shell=True)
+
+
 def _datetime():
     """Return the current datetime as a string.
 
@@ -70,7 +80,23 @@ def parse_rsync_arg(arg):
     logger.debug("Path: %s" % path)
     return user,host,path
 
-def backup(SRC, DEST, debug, compress, fuzzy, progress, debug):
+
+class RsyncError(Exception):
+
+    """Raised if rsync exits with non-zero status."""
+
+    pass
+
+
+class MoveError(Exception):
+
+    """Raised if the `mv ... && rm ... && ln ...` command exits non-zero."""
+
+    pass
+
+
+def backup(SRC, DEST, debug=False, compress=True, fuzzy=True, progress=True,
+           exclude=None):
     logger = logging.getLogger("backup.main")
 
     if debug:
@@ -138,19 +164,26 @@ def backup(SRC, DEST, debug, compress, fuzzy, progress, debug):
         mv_cmd += '"'
 
     print rsync_cmd
-    exit_status = subprocess.call(rsync_cmd, shell=True)
+    exit_status = _run(rsync_cmd)
     if exit_status != 0:
-        sys.exit(exit_status)
+        raise RsyncError(exit_status)
 
     if not debug:
         print mv_cmd
-        exit_status = subprocess.call(mv_cmd, shell=True)
+        exit_status = _run(mv_cmd)
         if exit_status != 0:
-            sys.exit(exit_status)
+            raise MoveError(exit_status)
 
 
-def parse_cli():
+class CommandLineArgumentsError(Exception):
+    pass
+
+
+def parse_cli(args=None):
     """Parse the command-line arguments."""
+    if args is None:
+        args = sys.argv[1:]
+
     parser = OptionParser(usage="usage: %prog [options] SRC DEST")
     parser.add_option(
         '-d', '--debug', '-n', '--dry-run', dest='debug', action='store_true',
@@ -174,10 +207,10 @@ def parse_cli():
         action='append',
         help="Exclude files matching PATTERN, e.g. --exclude '.git/*' (see "
              "the --exclude option in `man rsync`)")
-    (options, args) = parser.parse_args()
+    (options, args) = parser.parse_args(args)
 
     if len(args) != 2:
-        sys.exit(parser.get_usage())
+        raise CommandLineArgumentsError(parser.get_usage())
 
     src = args[0]
     dest = args[1]
@@ -186,8 +219,14 @@ def parse_cli():
 
 
 def main():
-    src, dest, debug, compress, fuzzy, progress, exclude = parse_cli()
-    backup(src, dest, debug, compress, fuzzy, progress, exclude)
+    try:
+        src, dest, debug, compress, fuzzy, progress, exclude = parse_cli()
+    except CommandLineArgumentsError as err:
+        sys.exit(err.message)
+    try:
+        backup(src, dest, debug, compress, fuzzy, progress, exclude)
+    except (RsyncError, MoveError) as err:
+        sys.exit(err.message)
 
 
 if __name__ == "__main__":
