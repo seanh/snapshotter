@@ -64,7 +64,7 @@ class TestFunctional(object):
 
     """Functional tests that actually run rsync and other commands."""
 
-    @mock.patch("snapshotter._datetime")
+    @mock.patch("snapshotter.snapshotter._datetime")
     def test_functional(self, mock_datetime_function):
         """One functional test that actually calls rsync and copies files."""
         datetime = "2015-02-23T18_58_02"
@@ -103,11 +103,11 @@ class TestSnapshot(object):
 
     def setup(self):
         """Patch the _run() and _datetime() functions."""
-        self.run_patcher = mock.patch('snapshotter._run')
+        self.run_patcher = mock.patch('snapshotter.snapshotter._run')
         self.mock_run_function = self.run_patcher.start()
         self.mock_run_function.return_value = 0
 
-        self.datetime_patcher = mock.patch('snapshotter._datetime')
+        self.datetime_patcher = mock.patch('snapshotter.snapshotter._datetime')
         self.mock_datetime_function = self.datetime_patcher.start()
         self.datetime = "2015-02-23T18_58_02"
         self.mock_datetime_function.return_value = self.datetime
@@ -200,8 +200,7 @@ class TestSnapshot(object):
         src_arg = args.split()[-2]
         dst_arg = args.split()[-1]
         assert src_arg == "'Mail/'"
-        assert dst_arg == os.path.join(
-            _this_directory(), dst, "incomplete.snapshot")
+        assert dst_arg == os.path.join(os.getcwd(), dst, "incomplete.snapshot")
 
     def test_relative_local_to_absolute_local(self):
         """Test backing up a relative local dir to an absolute local dir."""
