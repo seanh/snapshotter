@@ -1,3 +1,7 @@
+[![Build Status](https://travis-ci.org/seanh/snapshotter.svg)](https://travis-ci.org/seanh/snapshotter)
+[![Coverage Status](https://img.shields.io/coveralls/seanh/snapshotter.svg)](https://coveralls.io/r/seanh/snapshotter)
+
+
 Snapshotter
 ===========
 
