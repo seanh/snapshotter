@@ -20,17 +20,17 @@ class TestCLI(object):
 
     def test_with_no_src_or_dest_args(self):
         nose.tools.assert_raises(
-            snapshotter.CommandLineArgumentsError, snapshotter.parse_cli,
+            snapshotter.CommandLineArgumentsError, snapshotter._parse_cli,
             args=[])
 
     def test_with_no_dest_arg(self):
         nose.tools.assert_raises(
-            snapshotter.CommandLineArgumentsError, snapshotter.parse_cli,
+            snapshotter.CommandLineArgumentsError, snapshotter._parse_cli,
             args=["/home/fred"])
 
     def test_with_default_options(self):
         src, dest, debug, compress, fuzzy, progress, exclude = (
-            snapshotter.parse_cli(args=["/home/fred", "/media/backup"]))
+            snapshotter._parse_cli(args=["/home/fred", "/media/backup"]))
         assert src == "/home/fred"
         assert dest == "/media/backup"
         assert debug is False
@@ -41,7 +41,7 @@ class TestCLI(object):
 
     def test_dry_run(self):
         for option in ("-n", "--dry-run"):
-            _, _, debug, _, _, _, _ = snapshotter.parse_cli(
+            _, _, debug, _, _, _, _ = snapshotter._parse_cli(
                 args=[option, "/home/fred", "/media/backup"])
             assert debug is True
 
@@ -143,7 +143,7 @@ class TestSnapshot(object):
         assert "--dry-run" not in args
 
     def test_without_trailing_slash(self):
-        """A trailing / should be appened to SRC if not given."""
+        """A trailing / should be appened to the source path if not given."""
         src = "/home/fred"  # No trailing slash.
         dst = "/media/backup"
 
@@ -216,7 +216,7 @@ class TestSnapshot(object):
         assert dst_arg == "/media/backup/Music.snapshots/incomplete.snapshot"
 
     def test_tilde_in_backup_source(self):
-        """Test giving a SRC dir with a ~ in it."""
+        """Test giving a source path with a ~ in it."""
         src = "~"
         dst = "/media/SNAPSHOTS"
 
@@ -228,7 +228,7 @@ class TestSnapshot(object):
         assert src_arg == "'~/'"
 
     def test_root_as_source(self):
-        """Test giving / as the SRC dir."""
+        """Test giving / as the source path."""
         src = "/"
         dst = "/media/SNAPSHOTS"
 

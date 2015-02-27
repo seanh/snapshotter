@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """
+
 A script for making incremental snapshot backups of directories using rsync.
 See README.markdown for instructions.
 
@@ -32,36 +33,40 @@ def _datetime():
     return datetime.datetime.now().strftime("%Y-%m-%dT%H_%M_%S")
 
 
-def is_remote(arg):
-    """Return True if the given SRC or DEST argument specifies a remote path,
-    False if it specifies a local path.
+def _is_remote(src_or_dest):
+    """Return True if src_or_dest is a remote path, False otherwise.
+
+    :param src_or_dest: an rsync source or destination argument
+        (as you would pass to rsync on the command line)
 
     """
     # If it has a : before the first / then it's a remote path.
-    return ':' in arg.split('/')[0]
+    return ':' in src_or_dest.split('/')[0]
 
-def parse_rsync_arg(arg):
-    """Parse the given SRC or DEST argument and return tuple containing its
-    user, host and path parts:
+
+def _parse_rsync_arg(arg):
+    """Parse the given rsync SRC or DEST argument.
+
+    Return a tuple containing the user, host and path parts of the argument.
 
     user    :       The username in a remote path spec.
-                            'seanh' in 'seanh@mydomain.org:/path/to/backups'.
-                            None if arg is a local path or a remote path without a
-                            username.
+                    'seanh' in 'seanh@mydomain.org:/path/to/backups'.
+                    None if arg is a local path or a remote path without a
+                    username.
     host    :       The hostname in a remote path spec.
-                            'mydomain.org' in 'seanh@mydomain.org:/path/to/backups'.
-                            None if arg is a local path.
+                    'mydomain.org' in 'seanh@mydomain.org:/path/to/backups'.
+                    None if arg is a local path.
     path    :       The path in a local or remote path spec.
-                            '/path/to/backups' in the remote path 'seanh@mydomain.org:/path/to/backups'.
-                            '/media/BACKUP' in the local path '/media/BACKUP'.
+                    '/path/to/backups' in the remote path
+                    'seanh@mydomain.org:/path/to/backups'.
+                    '/media/BACKUP' in the local path '/media/BACKUP'.
 
     """
-    logger = logging.getLogger("snapshotter.parse_rsync_arg")
-    logger.debug("Parsing rsync arg %s" % arg)
-    parts = {}
-    if is_remote(arg):
+    logger = logging.getLogger("snapshotter._parse_rsync_arg")
+    logger.debug("Parsing rsync arg %s", arg)
+    if _is_remote(arg):
         logger.debug("This is a remote path")
-        before_first_colon, after_first_colon = arg.split(':',1)
+        before_first_colon, after_first_colon = arg.split(':', 1)
         if '@' in before_first_colon:
             logger.debug("User is specified in the path")
             user = before_first_colon.split('@')[0]
@@ -75,15 +80,15 @@ def parse_rsync_arg(arg):
         user = None
         host = None
         path = os.path.abspath(os.path.expanduser(arg))
-    logger.debug("User: %s" % user)
-    logger.debug("Host: %s" % host)
-    logger.debug("Path: %s" % path)
-    return user,host,path
+    logger.debug("User: %s", user)
+    logger.debug("Host: %s", host)
+    logger.debug("Path: %s", path)
+    return user, host, path
 
 
 class RsyncError(Exception):
 
-    """Raised if rsync exits with non-zero status."""
+    """The error type that's raised if rsync exits with non-zero status."""
 
     pass
 
@@ -95,54 +100,59 @@ class MoveError(Exception):
     pass
 
 
-def snapshot(SRC, DEST, debug=False, compress=True, fuzzy=True, progress=True,
-             exclude=None):
+def snapshot(source, dest, debug=False, compress=True, fuzzy=True,
+             progress=True, exclude=None):
     logger = logging.getLogger("snapshotter.snapshot")
 
     if debug:
         logging.basicConfig(level=logging.DEBUG)
 
-    # Make sure SRC ends with / because this affects how rsync behaves.
-    if not SRC.endswith(os.sep):
-        SRC += os.sep
+    # Make sure source ends with / because this affects how rsync behaves.
+    if not source.endswith(os.sep):
+        source += os.sep
 
-    logger.debug("SRC is: %s" % SRC)
-    logger.debug("DEST is: %s" % DEST)
+    logger.debug("source is: %s", source)
+    logger.debug("dest is: %s", dest)
 
     date = _datetime()
-    logger.debug("date is: %s" % date)
+    logger.debug("date is: %s", date)
 
-    user,host,snapshots_root = parse_rsync_arg(DEST)
+    user, host, snapshots_root = _parse_rsync_arg(dest)
 
-    # Construct the list of options to be passed to rsync.
-    rsync_options = ['--archive', # Copy recursively and preserve times, permissions, symlinks, etc.
+    rsync_options = [
+        # Copy recursively and preserve times, permissions, symlinks, etc.
+        '--archive',
         '--partial',
-        '--partial-dir=partially_transferred_files', # Keep partially transferred files if the transfer is interrupted
-        '--one-file-system', # Don't cross filesystem boundaries
-        '--delete', # Delete extraneous files from dest dirs
-        '--delete-excluded', # Also delete excluded files from dest dirs
-        '--itemize-changes', # Output a change-summary for all updates
-        '--link-dest=../latest.snapshot', # Make hard-links to the previous snapshot, if any
-        '--human-readable', # Output numbers in a human-readable format
-        '--quiet', # Suppress non-error output messages
-        # '-F', # Enable per-directory .rsync-filter files.
+        # Keep partially transferred files if the transfer is interrupted.
+        '--partial-dir=partially_transferred_files',
+        '--one-file-system',  # Don't cross filesystem boundaries.
+        '--delete',  # Delete extraneous files from dest dirs.
+        '--delete-excluded',  # Also delete excluded files from dest dirs.
+        '--itemize-changes',  # Output a change-summary for all updates.
+        # Make hard-links to the previous snapshot, if any.
+        '--link-dest=../latest.snapshot',
+        '--human-readable',  # Output numbers in a human-readable format.
+        '--quiet',  # Suppress non-error output messages.
         ]
+
     if compress:
-        rsync_options.append('--compress') # Compress files during transfer
+        rsync_options.append('--compress')  # Compress files during transfer.
     if fuzzy:
-        rsync_options.append('--fuzzy') # Look for basis files for any destination files that are missing
+        # Look for basis files for any destination files that are missing.
+        rsync_options.append('--fuzzy')
     if progress:
-        rsync_options.append('--progress') # Print progress while transferring files
+        # Print progress while transferring files.
+        rsync_options.append('--progress')
     if os.path.isfile(os.path.expanduser("~/.snapshotter/excludes")):
-        rsync_options.append('--exclude-from=$HOME/.snapshotter/excludes') # Read exclude patterns from file
+        # Read exclude patterns from file.
+        rsync_options.append('--exclude-from=$HOME/.snapshotter/excludes')
     if debug:
         rsync_options.append('--dry-run')
     if exclude is not None:
         for pattern in exclude:
             rsync_options.append("--exclude '%s'" % pattern)
 
-    # Construct the rsync command.
-    rsync_cmd = "rsync %s '%s' " % (' '.join(rsync_options),SRC)
+    rsync_cmd = "rsync %s '%s' " % (' '.join(rsync_options), source)
     if host is not None:
         if user is not None:
             rsync_cmd += "%s@" % user
@@ -157,29 +167,34 @@ def snapshot(SRC, DEST, debug=False, compress=True, fuzzy=True, progress=True,
         if user is not None:
             mv_cmd += "%s@" % user
         mv_cmd += '%s "' % host
-    mv_cmd += "mv %s/incomplete.snapshot %s/%s.snapshot " % (snapshots_root,snapshots_root,date)    
+    mv_cmd += "mv %s/incomplete.snapshot %s/%s.snapshot " % (
+        snapshots_root, snapshots_root, date)
     mv_cmd += "&& rm -f %s/latest.snapshot " % snapshots_root
-    mv_cmd += "&& ln -s %s.snapshot %s/latest.snapshot" % (date,snapshots_root)
+    mv_cmd += "&& ln -s %s.snapshot %s/latest.snapshot" % (
+        date, snapshots_root)
     if host is not None:
         mv_cmd += '"'
 
-    print rsync_cmd
+    print(rsync_cmd)
     exit_status = _run(rsync_cmd)
     if exit_status != 0:
         raise RsyncError(exit_status)
 
     if not debug:
-        print mv_cmd
+        print(mv_cmd)
         exit_status = _run(mv_cmd)
         if exit_status != 0:
             raise MoveError(exit_status)
 
 
 class CommandLineArgumentsError(Exception):
+
+    """The exception that's raised if the command-line args are invalid."""
+
     pass
 
 
-def parse_cli(args=None):
+def _parse_cli(args=None):
     """Parse the command-line arguments."""
     if args is None:
         args = sys.argv[1:]
@@ -219,8 +234,14 @@ def parse_cli(args=None):
 
 
 def main():
+    """Parse command-line args and pass them to snapshot().
+
+    Also turns any known exceptions raised into clean sys.exit()s with a
+    non-zero exit status and an error message printed, instead of stack traces.
+
+    """
     try:
-        src, dest, debug, compress, fuzzy, progress, exclude = parse_cli()
+        src, dest, debug, compress, fuzzy, progress, exclude = _parse_cli()
     except CommandLineArgumentsError as err:
         sys.exit(err.message)
     try:
