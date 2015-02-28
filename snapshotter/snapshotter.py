@@ -225,7 +225,48 @@ def _parse_rsync_arg(arg):
     return user, host, path
 
 
-def snapshot(source, dest, debug=False, compress=True, exclude=None):
+def snapshot(source, dest, debug=False, exclude=None):
+    """Make a new snapshot of source in dest.
+
+    Make a new snapshot means:
+
+    1. Run rsync with all the correct arguments (including the --link-dest arg
+       to tell rsync to make hard-links to files that haven't changed since the
+       previous snapshot)
+    2. Then if rsync succeeds move the incomplete.snapshot directory to
+       YYYY-MM-DDTHH_MM_SS.snapshot
+    3. Then if that succeeds update the latest.snapshot symlink to point to the
+       newly-created snapshot.
+
+    Either source or dest can be a local path or a remote path
+    (e.g. seanh@mydomain.org:Snapshots/Documents or just
+    mydomain.org:Snapshots/Documents). Either can be a relative path and can
+    contain ~ (which will be expanded to the path to the user's home
+    directory).
+
+    If dest if a remote path then ssh will be used to run mv, rm and ln to
+    move the incomplete.snapshot directory and update the latest.snapshot
+    symlink remotely.
+
+    :param source: the path to the source directory to be backed up
+    :type source: string
+
+    :param dest: the path to the destination directory that will contain the
+        snapshots
+    :type dest: string
+
+    :param debug: if True do a dry-run: pass the --dry-run argument to rsync
+        so it doesn't actually copy any files, and don't actually move the
+        incomplete.snapshot directory or update the latest.snapshot symlink
+    :type debug: bool
+
+    :raises CalledProcessError: if any of the commands fails or exits with a
+        non-zero exit value
+
+    :raises NoSuchCommandError: if any of the rsync, mv, ln or ssh commands
+        aren't found at the expected location
+
+    """
     date = _datetime()
     user, host, snapshots_root = _parse_rsync_arg(dest)
     _rsync(source, dest, debug, exclude)
