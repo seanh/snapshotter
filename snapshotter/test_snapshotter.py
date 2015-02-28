@@ -19,13 +19,13 @@ class TestRun(object):
     """Tests for the _run() function."""
 
     def test_success_with_stdout(self):
-        output = snapshotter._run("echo foo")
+        output = snapshotter._run("echo foo".split())
         assert output == "foo\n"
 
     def test_failed_command(self):
         command = "rsync --foobar"
         try:
-            snapshotter._run(command)
+            snapshotter._run(command.split())
             assert False
         except snapshotter.CalledProcessError as err:
             assert err.command == command
@@ -206,7 +206,7 @@ class TestSnapshot(object):
 
         args = _get_args(self.mock_run_function.call_args_list[0])
         link_dest_args = [
-            a for a in args.split() if a.startswith("--link-dest")]
+            a for a in args if a.startswith("--link-dest")]
         assert len(link_dest_args) == 1
         link_dest_arg = link_dest_args[0]
         name, value = link_dest_arg.split("=")
@@ -220,8 +220,8 @@ class TestSnapshot(object):
         snapshotter.snapshot(src, dst)
 
         args = _get_args(self.mock_run_function.call_args_list[0])
-        src_arg = args.split()[-2]
-        dst_arg = args.split()[-1]
+        src_arg = args[-2]
+        dst_arg = args[-1]
         assert src_arg == "Mail/"
         assert dst_arg == os.path.join(os.getcwd(), dst, "incomplete.snapshot")
 
@@ -233,8 +233,8 @@ class TestSnapshot(object):
         snapshotter.snapshot(src, dst)
 
         args = _get_args(self.mock_run_function.call_args_list[0])
-        src_arg = args.split()[-2]
-        dst_arg = args.split()[-1]
+        src_arg = args[-2]
+        dst_arg = args[-1]
         assert src_arg == "Music/"
         assert dst_arg == "/media/backup/Music.snapshots/incomplete.snapshot"
 
@@ -246,8 +246,8 @@ class TestSnapshot(object):
         snapshotter.snapshot(src, dst)
 
         args = _get_args(self.mock_run_function.call_args_list[0])
-        src_arg = args.split()[-2]
-        dst_arg = args.split()[-1]
+        src_arg = args[-2]
+        dst_arg = args[-1]
         assert src_arg == "~/"
 
     def test_root_as_source(self):
@@ -258,8 +258,8 @@ class TestSnapshot(object):
         snapshotter.snapshot(src, dst)
 
         args = _get_args(self.mock_run_function.call_args_list[0])
-        src_arg = args.split()[-2]
-        dst_arg = args.split()[-1]
+        src_arg = args[-2]
+        dst_arg = args[-1]
         assert src_arg == "/"
         assert dst_arg == "/media/SNAPSHOTS/incomplete.snapshot"
 
@@ -271,7 +271,7 @@ class TestSnapshot(object):
 
         expected_destination = os.path.join(dst, "incomplete.snapshot")
         args = _get_args(self.mock_run_function.call_args_list[0])
-        dst_arg = args.split()[-1]
+        dst_arg = args[-1]
         assert dst_arg == "{dst}".format(dst=expected_destination)
 
     def test_with_remote_source(self):
@@ -281,7 +281,7 @@ class TestSnapshot(object):
         snapshotter.snapshot(src, dst)
 
         args = _get_args(self.mock_run_function.call_args_list[0])
-        src_arg = args.split()[-2]
+        src_arg = args[-2]
         assert src_arg == "{src}/".format(src=src)
 
     def test_mv_command(self):
@@ -290,9 +290,9 @@ class TestSnapshot(object):
 
         snapshotter.snapshot(src, dst)
 
-        mv = self.mock_run_function.call_args_list[1][0][0]
-        rm = self.mock_run_function.call_args_list[2][0][0]
-        ln = self.mock_run_function.call_args_list[3][0][0]
+        mv = ' '.join(self.mock_run_function.call_args_list[1][0][0])
+        rm = ' '.join(self.mock_run_function.call_args_list[2][0][0])
+        ln = ' '.join(self.mock_run_function.call_args_list[3][0][0])
 
         # The absolute path to the incomplete.snapshot dir, no trailing /.
         incomplete_dir = os.path.join(
@@ -323,9 +323,9 @@ class TestSnapshot(object):
 
         incomplete_dir = "/path/to/snapshots/incomplete.snapshot"
         snapshot_dir = "/path/to/snapshots/" + self.datetime + ".snapshot"
-        mv = self.mock_run_function.call_args_list[1][0][0]
+        mv = ' '.join(self.mock_run_function.call_args_list[1][0][0])
         expected_call = (
-            'ssh you@yourdomain.org "mv {incomplete} {snapshot}"'.format(
+            'ssh you@yourdomain.org mv {incomplete} {snapshot}'.format(
                 incomplete=incomplete_dir, snapshot=snapshot_dir))
         assert mv == expected_call
 
@@ -339,10 +339,10 @@ class TestSnapshot(object):
 
         incomplete_dir = "/path/to/snapshots/incomplete.snapshot"
         snapshot_dir = "/path/to/snapshots/" + self.datetime + ".snapshot"
-        mv = self.mock_run_function.call_args_list[1][0][0]
+        mv = ' '.join(self.mock_run_function.call_args_list[1][0][0])
         expected_call = (
             'ssh yourdomain.org '
-            '"mv {incomplete} {snapshot}"'.format(
+            'mv {incomplete} {snapshot}'.format(
                 incomplete=incomplete_dir, snapshot=snapshot_dir))
         assert mv == expected_call
 

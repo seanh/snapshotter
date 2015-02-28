@@ -48,13 +48,13 @@ def _run(command):
     """
     try:
         return subprocess.check_output(
-            command.split(), stderr=subprocess.STDOUT)
+            command, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as err:
         raise CalledProcessError(
-            command, err.output, err.returncode)
+            ' '.join(command), err.output, err.returncode)
     except OSError as err:
         if err.errno == 2:
-            raise NoSuchCommandError(command, err.strerror)
+            raise NoSuchCommandError(' '.join(command), err.strerror)
         else:
             raise
 
@@ -122,7 +122,8 @@ def snapshot(source, dest, debug=False, compress=True, exclude=None):
 
     user, host, snapshots_root = _parse_rsync_arg(dest)
 
-    rsync_options = [
+    rsync_cmd = [
+        "rsync",
         # Copy recursively and preserve times, permissions, symlinks, etc.
         '--archive',
         '--partial',
@@ -142,36 +143,46 @@ def snapshot(source, dest, debug=False, compress=True, exclude=None):
 
     if os.path.isfile(os.path.expanduser("~/.snapshotter/excludes")):
         # Read exclude patterns from file.
-        rsync_options.append('--exclude-from=$HOME/.snapshotter/excludes')
+        rsync_cmd.append('--exclude-from=$HOME/.snapshotter/excludes')
     if debug:
-        rsync_options.append('--dry-run')
+        rsync_cmd.append('--dry-run')
     if exclude is not None:
         for pattern in exclude:
-            rsync_options.append("--exclude '%s'" % pattern)
+            rsync_cmd.append("--exclude '%s'" % pattern)
 
-    rsync_cmd = "rsync %s %s " % (' '.join(rsync_options), source)
+    rsync_cmd.append(source)
+    dest = ''
     if host is not None:
         if user is not None:
-            rsync_cmd += "%s@" % user
-        rsync_cmd += "%s:" % host
-    rsync_cmd += "%s/incomplete.snapshot" % snapshots_root
+            dest += "%s@" % user
+        dest += "%s:" % host
+    dest += "%s/incomplete.snapshot" % snapshots_root
+    rsync_cmd.append(dest)
 
-    # Construct the `mv && rm && ln` command to be executed after the rsync
-    # command completes successfully.
-    mv_cmd = ""
-    if host is not None:
-        mv_cmd += "ssh "
+    def _wrap_in_ssh(command):
+        if not host:
+            # We aren't dealing with a remote destination so there's no need
+            # to wrap the command in an ssh command.
+            return command
+
+        ssh_command = ["ssh"]
+        host_part = ""
         if user is not None:
-            mv_cmd += "%s@" % user
-        mv_cmd += '%s "' % host
-    mv_cmd += "mv %s/incomplete.snapshot %s/%s.snapshot" % (
-        snapshots_root, snapshots_root, date)
-    if host is not None:
-        mv_cmd += '"'
+            host_part += "%s@" % user
+        host_part += host
+        ssh_command.append(host_part)
+        ssh_command.extend(command)
+        return ssh_command
 
-    rm_cmd = "rm -f %s/latest.snapshot" % snapshots_root
-    ln_cmd = "ln -s %s.snapshot %s/latest.snapshot" % (
-        date, snapshots_root)
+    mv_src = "%s/incomplete.snapshot" % snapshots_root
+    mv_dest = "%s/%s.snapshot" % (snapshots_root, date)
+    mv_cmd = _wrap_in_ssh(["mv", mv_src, mv_dest])
+
+    rm_cmd = _wrap_in_ssh(["rm", "-f", "%s/latest.snapshot" % snapshots_root])
+
+    ln_cmd = _wrap_in_ssh(
+        ["ln", "-s", "%s.snapshot" % date,
+         "%s/latest.snapshot" % snapshots_root])
 
     print(rsync_cmd)
     _run(rsync_cmd)
