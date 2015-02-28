@@ -29,19 +29,16 @@ class TestCLI(object):
             args=["/home/fred"])
 
     def test_with_default_options(self):
-        src, dest, debug, compress, fuzzy, progress, exclude = (
+        src, dest, debug, exclude = (
             snapshotter._parse_cli(args=["/home/fred", "/media/backup"]))
         assert src == "/home/fred"
         assert dest == "/media/backup"
         assert debug is False
-        assert compress is True
-        assert fuzzy is True
-        assert progress is True
         assert exclude is None
 
     def test_dry_run(self):
         for option in ("-n", "--dry-run"):
-            _, _, debug, _, _, _, _ = snapshotter._parse_cli(
+            _, _, debug, _ = snapshotter._parse_cli(
                 args=[option, "/home/fred", "/media/backup"])
             assert debug is True
 

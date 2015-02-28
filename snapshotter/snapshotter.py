@@ -90,8 +90,7 @@ class MoveError(Exception):
     pass
 
 
-def snapshot(source, dest, debug=False, compress=True, fuzzy=True,
-             progress=True, exclude=None):
+def snapshot(source, dest, debug=False, compress=True, exclude=None):
     # Make sure source ends with / because this affects how rsync behaves.
     if not source.endswith(os.sep):
         source += os.sep
@@ -114,16 +113,10 @@ def snapshot(source, dest, debug=False, compress=True, fuzzy=True,
         '--link-dest=../latest.snapshot',
         '--human-readable',  # Output numbers in a human-readable format.
         '--quiet',  # Suppress non-error output messages.
+        '--compress',  # Compress files during transfer.
+        '--fuzzy',  # Look for basis files for any missing destination files.
         ]
 
-    if compress:
-        rsync_options.append('--compress')  # Compress files during transfer.
-    if fuzzy:
-        # Look for basis files for any destination files that are missing.
-        rsync_options.append('--fuzzy')
-    if progress:
-        # Print progress while transferring files.
-        rsync_options.append('--progress')
     if os.path.isfile(os.path.expanduser("~/.snapshotter/excludes")):
         # Read exclude patterns from file.
         rsync_options.append('--exclude-from=$HOME/.snapshotter/excludes')
@@ -187,18 +180,6 @@ def _parse_cli(args=None):
         help="Perform a trial-run with no changes made (pass the --dry-run "
              "option to rsync)")
     parser.add_option(
-        '--no-compress', dest='compress', action='store_false', default=True,
-        help="Do not compress file data during transfer (do not pass the "
-             "--compress argument to rsync)")
-    parser.add_option(
-        '--no-fuzzy', dest='fuzzy', action='store_false', default=True,
-        help="Do not look for basis files for destination files that are "
-             "missing (do not pass the --fuzzy argument to rsync)")
-    parser.add_option(
-        '--no-progress', dest='progress', action='store_false', default=True,
-        help="Do not show progress during transfer (do not pass the "
-             "--progress argument to rsync)")
-    parser.add_option(
         '--exclude', type='string', dest='exclude', metavar="PATTERN",
         action='append',
         help="Exclude files matching PATTERN, e.g. --exclude '.git/*' (see "
@@ -210,8 +191,7 @@ def _parse_cli(args=None):
 
     src = args[0]
     dest = args[1]
-    return (src, dest, options.debug, options.compress, options.fuzzy,
-            options.progress, options.exclude)
+    return (src, dest, options.debug, options.exclude)
 
 
 def main():
@@ -222,11 +202,11 @@ def main():
 
     """
     try:
-        src, dest, debug, compress, fuzzy, progress, exclude = _parse_cli()
+        src, dest, debug, exclude = _parse_cli()
     except CommandLineArgumentsError as err:
         sys.exit(err.message)
     try:
-        snapshot(src, dest, debug, compress, fuzzy, progress, exclude)
+        snapshot(src, dest, debug, exclude)
     except (RsyncError, MoveError) as err:
         sys.exit(err.message)
 
