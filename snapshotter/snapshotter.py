@@ -132,17 +132,43 @@ def _wrap_in_ssh(command, user, host):
     return ssh_command
 
 
-def _mv(src, dest, user, host):
+def _mv(src, dest, user=None, host=None):
     mv_cmd = _wrap_in_ssh(["mv", src, dest], user, host)
     print(mv_cmd)
     _run(mv_cmd)
 
 
-def _move_incomplete_dir(snapshots_root, date, user, host, debug=False):
+def _move_incomplete_dir(snapshots_root, date, user=None, host=None,
+                         debug=False):
     src = "%s/incomplete.snapshot" % snapshots_root
     dest = "%s/%s.snapshot" % (snapshots_root, date)
     if not debug:
         _mv(src, dest, user, host)
+
+
+def _rm(file_, user=None, host=None):
+    command = _wrap_in_ssh(["rm", "-f", file_], user, host)
+    print(command)
+    _run(command)
+
+
+def _remove_latest_symlink(snapshots_root, user=None, host=None):
+    _rm("%s/latest.snapshot" % snapshots_root, user, host)
+
+
+def _ln(target, link_name, user=None, host=None):
+    command = _wrap_in_ssh(["ln", "-s", target, link_name], user, host)
+    print(command)
+    _run(command)
+
+
+def _update_latest_symlink(date, snapshots_root, user=None, host=None,
+                           debug=False):
+    target = "%s.snapshot" % date
+    link_name = "%s/latest.snapshot" % snapshots_root
+    if not debug:
+        _remove_latest_symlink(snapshots_root, user, host)
+        _ln(target, link_name, user, host)
 
 
 def _datetime():
@@ -201,25 +227,10 @@ def _parse_rsync_arg(arg):
 
 def snapshot(source, dest, debug=False, compress=True, exclude=None):
     date = _datetime()
-
     user, host, snapshots_root = _parse_rsync_arg(dest)
-
-    rm_cmd = _wrap_in_ssh(
-        ["rm", "-f", "%s/latest.snapshot" % snapshots_root], user, host)
-
-    ln_cmd = _wrap_in_ssh(
-        ["ln", "-s", "%s.snapshot" % date,
-         "%s/latest.snapshot" % snapshots_root],
-        user, host)
-
     _rsync(source, dest, debug, exclude)
     _move_incomplete_dir(snapshots_root, date, user, host, debug)
-
-    if not debug:
-        print(rm_cmd)
-        _run(rm_cmd)
-        print(ln_cmd)
-        _run(ln_cmd)
+    _update_latest_symlink(date, snapshots_root, user, host, debug)
 
 
 class CommandLineArgumentsError(Exception):
