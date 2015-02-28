@@ -59,6 +59,63 @@ def _run(command):
             raise
 
 
+def _rsync(source, dest, debug=False, exclude=None):
+    """Run an rsync command as a subprocess.
+
+    :raises CalledProcessError: if rsync exits with a non-zero exit value
+    :raises NoSuchCommandError: if rsync is not installed in the expected
+        location
+
+    """
+    # Make sure source ends with / because this affects how rsync behaves.
+    if not source.endswith(os.sep):
+        source += os.sep
+
+    rsync_cmd = [
+        "rsync",
+        # Copy recursively and preserve times, permissions, symlinks, etc.
+        '--archive',
+        '--partial',
+        # Keep partially transferred files if the transfer is interrupted.
+        '--partial-dir=partially_transferred_files',
+        '--one-file-system',  # Don't cross filesystem boundaries.
+        '--delete',  # Delete extraneous files from dest dirs.
+        '--delete-excluded',  # Also delete excluded files from dest dirs.
+        '--itemize-changes',  # Output a change-summary for all updates.
+        # Make hard-links to the previous snapshot, if any.
+        '--link-dest=../latest.snapshot',
+        '--human-readable',  # Output numbers in a human-readable format.
+        '--quiet',  # Suppress non-error output messages.
+        '--compress',  # Compress files during transfer.
+        '--fuzzy',  # Look for basis files for any missing destination files.
+        ]
+
+    if os.path.isfile(os.path.expanduser("~/.snapshotter/excludes")):
+        # Read exclude patterns from file.
+        rsync_cmd.append('--exclude-from=$HOME/.snapshotter/excludes')
+
+    if debug:
+        rsync_cmd.append('--dry-run')
+
+    if exclude is not None:
+        for pattern in exclude:
+            rsync_cmd.append("--exclude '%s'" % pattern)
+
+    rsync_cmd.append(source)
+
+    user, host, snapshots_root = _parse_rsync_arg(dest)
+    dest = ''
+    if host is not None:
+        if user is not None:
+            dest += "%s@" % user
+        dest += "%s:" % host
+    dest += "%s/incomplete.snapshot" % snapshots_root
+    rsync_cmd.append(dest)
+
+    print(rsync_cmd)
+    _run(rsync_cmd)
+
+
 def _datetime():
     """Return the current datetime as a string.
 
@@ -114,50 +171,9 @@ def _parse_rsync_arg(arg):
 
 
 def snapshot(source, dest, debug=False, compress=True, exclude=None):
-    # Make sure source ends with / because this affects how rsync behaves.
-    if not source.endswith(os.sep):
-        source += os.sep
-
     date = _datetime()
 
     user, host, snapshots_root = _parse_rsync_arg(dest)
-
-    rsync_cmd = [
-        "rsync",
-        # Copy recursively and preserve times, permissions, symlinks, etc.
-        '--archive',
-        '--partial',
-        # Keep partially transferred files if the transfer is interrupted.
-        '--partial-dir=partially_transferred_files',
-        '--one-file-system',  # Don't cross filesystem boundaries.
-        '--delete',  # Delete extraneous files from dest dirs.
-        '--delete-excluded',  # Also delete excluded files from dest dirs.
-        '--itemize-changes',  # Output a change-summary for all updates.
-        # Make hard-links to the previous snapshot, if any.
-        '--link-dest=../latest.snapshot',
-        '--human-readable',  # Output numbers in a human-readable format.
-        '--quiet',  # Suppress non-error output messages.
-        '--compress',  # Compress files during transfer.
-        '--fuzzy',  # Look for basis files for any missing destination files.
-        ]
-
-    if os.path.isfile(os.path.expanduser("~/.snapshotter/excludes")):
-        # Read exclude patterns from file.
-        rsync_cmd.append('--exclude-from=$HOME/.snapshotter/excludes')
-    if debug:
-        rsync_cmd.append('--dry-run')
-    if exclude is not None:
-        for pattern in exclude:
-            rsync_cmd.append("--exclude '%s'" % pattern)
-
-    rsync_cmd.append(source)
-    dest = ''
-    if host is not None:
-        if user is not None:
-            dest += "%s@" % user
-        dest += "%s:" % host
-    dest += "%s/incomplete.snapshot" % snapshots_root
-    rsync_cmd.append(dest)
 
     def _wrap_in_ssh(command):
         if not host:
@@ -184,8 +200,7 @@ def snapshot(source, dest, debug=False, compress=True, exclude=None):
         ["ln", "-s", "%s.snapshot" % date,
          "%s/latest.snapshot" % snapshots_root])
 
-    print(rsync_cmd)
-    _run(rsync_cmd)
+    _rsync(source, dest, debug, exclude)
 
     if not debug:
         print(mv_cmd)
