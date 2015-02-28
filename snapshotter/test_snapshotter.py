@@ -14,6 +14,31 @@ def _this_directory():
     return os.path.split(sys.modules[__name__].__file__)[0]
 
 
+class TestRun(object):
+
+    """Tests for the _run() function."""
+
+    def test_success_with_stdout(self):
+        output = snapshotter._run("echo foo")
+        assert output == "foo\n"
+
+    def test_failed_command(self):
+        command = "rsync --foobar"
+        try:
+            snapshotter._run(command)
+            assert False
+        except snapshotter.CalledProcessError as err:
+            assert err.command == command
+            assert err.output == (
+                "rsync: --foobar: unknown option\nrsync error: syntax or "
+                "usage error (code 1) at main.c(1572) [client=3.1.0]\n")
+            assert err.exit_value == 1
+
+    def test_command_does_not_exist(self):
+        nose.tools.assert_raises(
+            snapshotter.NoSuchCommandError, snapshotter._run, "bar")
+
+
 class TestCLI(object):
 
     """Tests for the parse_cli() function."""
@@ -134,8 +159,8 @@ class TestSnapshot(object):
 
         snapshotter.snapshot(src, dst, debug=False)
 
-        assert self.mock_run_function.call_count == 2, (
-            "Both the rsync and mv commands should be run")
+        assert self.mock_run_function.call_count == 4, (
+            "We expect 4 commands to be run: rsync, mv, rm, ln")
         args = _get_args(self.mock_run_function.call_args_list[0])
         assert "--dry-run" not in args
 
@@ -160,16 +185,17 @@ class TestSnapshot(object):
         assert "/home/fred/" in args
 
     def test_rsync_error(self):
-        """snapshot() should raise RsyncError if rsync exits with non-zero."""
-        self.mock_run_function.return_value = 11
+        """Should raise CalledProcessError if rsync exits with non-zero."""
+        self.mock_run_function.side_effect = snapshotter.CalledProcessError(
+            "command", "output", 11)
         src = "/home/fred"
         dst = "/media/backup"
 
         try:
             snapshotter.snapshot(src, dst, debug=True)
             assert False, "snapshot() should have raised an exception"
-        except snapshotter.RsyncError as err:
-            assert err.message == 11
+        except snapshotter.CalledProcessError as err:
+            assert err.message == "output 11"
 
     def test_link_dest(self):
         """The right --link-dest=... arg should be given to rsync."""
@@ -196,7 +222,7 @@ class TestSnapshot(object):
         args = _get_args(self.mock_run_function.call_args_list[0])
         src_arg = args.split()[-2]
         dst_arg = args.split()[-1]
-        assert src_arg == "'Mail/'"
+        assert src_arg == "Mail/"
         assert dst_arg == os.path.join(os.getcwd(), dst, "incomplete.snapshot")
 
     def test_relative_local_to_absolute_local(self):
@@ -209,7 +235,7 @@ class TestSnapshot(object):
         args = _get_args(self.mock_run_function.call_args_list[0])
         src_arg = args.split()[-2]
         dst_arg = args.split()[-1]
-        assert src_arg == "'Music/'"
+        assert src_arg == "Music/"
         assert dst_arg == "/media/backup/Music.snapshots/incomplete.snapshot"
 
     def test_tilde_in_backup_source(self):
@@ -222,7 +248,7 @@ class TestSnapshot(object):
         args = _get_args(self.mock_run_function.call_args_list[0])
         src_arg = args.split()[-2]
         dst_arg = args.split()[-1]
-        assert src_arg == "'~/'"
+        assert src_arg == "~/"
 
     def test_root_as_source(self):
         """Test giving / as the source path."""
@@ -234,7 +260,7 @@ class TestSnapshot(object):
         args = _get_args(self.mock_run_function.call_args_list[0])
         src_arg = args.split()[-2]
         dst_arg = args.split()[-1]
-        assert src_arg == "'/'"
+        assert src_arg == "/"
         assert dst_arg == "/media/SNAPSHOTS/incomplete.snapshot"
 
     def test_with_remote_dest(self):
@@ -256,7 +282,7 @@ class TestSnapshot(object):
 
         args = _get_args(self.mock_run_function.call_args_list[0])
         src_arg = args.split()[-2]
-        assert src_arg == "'{src}/'".format(src=src)
+        assert src_arg == "{src}/".format(src=src)
 
     def test_mv_command(self):
         src = "Mail"
@@ -264,8 +290,9 @@ class TestSnapshot(object):
 
         snapshotter.snapshot(src, dst)
 
-        args = _get_args(self.mock_run_function.call_args_list[1])
-        mv, rm, ln = [arg.strip() for arg in args.split('&&')]
+        mv = self.mock_run_function.call_args_list[1][0][0]
+        rm = self.mock_run_function.call_args_list[2][0][0]
+        ln = self.mock_run_function.call_args_list[3][0][0]
 
         # The absolute path to the incomplete.snapshot dir, no trailing /.
         incomplete_dir = os.path.join(
@@ -294,19 +321,15 @@ class TestSnapshot(object):
 
         snapshotter.snapshot(src, dst)
 
-        args = _get_args(self.mock_run_function.call_args_list[1])
-
         incomplete_dir = "/path/to/snapshots/incomplete.snapshot"
-        latest_symlink = "/path/to/snapshots/latest.snapshot"
         snapshot_dir = "/path/to/snapshots/" + self.datetime + ".snapshot"
-        expected_args = (
-            'ssh you@yourdomain.org '
-            '"mv {incomplete} {snapshot} && '
-            'rm -f {latest} && '
-            'ln -s {datetime}.snapshot {latest}"'.format(
-                incomplete=incomplete_dir, latest=latest_symlink,
-                snapshot=snapshot_dir, datetime=self.datetime))
-        assert args == expected_args
+        mv = self.mock_run_function.call_args_list[1][0][0]
+        expected_call = (
+            'ssh you@yourdomain.org "mv {incomplete} {snapshot}"'.format(
+                incomplete=incomplete_dir, snapshot=snapshot_dir))
+        assert mv == expected_call
+
+    # TODO: Test the rm and ln commands with remote destinations as well.
 
     def test_mv_command_with_remote_dest_with_no_user(self):
         src = "Mail"
@@ -314,35 +337,27 @@ class TestSnapshot(object):
 
         snapshotter.snapshot(src, dst)
 
-        args = _get_args(self.mock_run_function.call_args_list[1])
-
         incomplete_dir = "/path/to/snapshots/incomplete.snapshot"
-        latest_symlink = "/path/to/snapshots/latest.snapshot"
         snapshot_dir = "/path/to/snapshots/" + self.datetime + ".snapshot"
-        expected_args = (
+        mv = self.mock_run_function.call_args_list[1][0][0]
+        expected_call = (
             'ssh yourdomain.org '
-            '"mv {incomplete} {snapshot} && '
-            'rm -f {latest} && '
-            'ln -s {datetime}.snapshot {latest}"'.format(
-                incomplete=incomplete_dir, latest=latest_symlink,
-                snapshot=snapshot_dir, datetime=self.datetime))
-        assert args == expected_args
+            '"mv {incomplete} {snapshot}"'.format(
+                incomplete=incomplete_dir, snapshot=snapshot_dir))
+        assert mv == expected_call
+
+    # TODO: Same test for rm and ln
 
     def test_mv_command_fails(self):
         """snapshot() should raise if the mv command exits with non-zero."""
         src = "Mail"
         dst = "Mail.snapshots"
 
-        def _run(command):
-            if command.startswith("mv "):
-                return 1
-            else:
-                return 0
-
-        self.mock_run_function.side_effect = _run
+        self.mock_run_function.side_effect = snapshotter.CalledProcessError(
+            "command", "output", 25)
 
         try:
             snapshotter.snapshot(src, dst)
             assert False, "snapshot() should have raised an exception"
-        except snapshotter.MoveError as err:
-            assert err.message == 1
+        except snapshotter.CalledProcessError as err:
+            assert err.message == "output 25"

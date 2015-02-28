@@ -12,14 +12,51 @@ import subprocess
 import optparse
 
 
-def _run(command):
-    """Run the given command as a subprocess.
+class CalledProcessError(Exception):
 
-    We wrap subprocess.call() in our own function to make it easy for tests
-    to patch this funtion.
+    """Exception type that's raised if an external command fails."""
+
+    def __init__(self, command, output, exit_value):
+        super(CalledProcessError, self).__init__(
+            output + " " + str(exit_value))
+        self.command = command
+        self.output = output
+        self.exit_value = exit_value
+
+
+class NoSuchCommandError(Exception):
+
+    """Raised when trying to run an external command that doesn't exist."""
+
+    def __init__(self, command, message):
+        super(NoSuchCommandError, self).__init__(message)
+        self.command = command
+
+
+def _run(command):
+    """Run the given command as a subprocess and return its stdout output.
+
+    This redirects the subprocess's stderr to stdout so the returned string
+    could contain everything printed to stdout and stderr together.
+
+    :raises CalledProcessError: If running the command fails or the command
+        exits with non-zero status. The command's stdout and stderr will be
+        availabled as error.output, and its exit status as error.exit_value.
+
+    :raises NoSuchCommandError: If the command doesn't exist.
 
     """
-    return subprocess.call(command, shell=True)
+    try:
+        return subprocess.check_output(
+            command.split(), stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as err:
+        raise CalledProcessError(
+            command, err.output, err.returncode)
+    except OSError as err:
+        if err.errno == 2:
+            raise NoSuchCommandError(command, err.strerror)
+        else:
+            raise
 
 
 def _datetime():
@@ -76,20 +113,6 @@ def _parse_rsync_arg(arg):
     return user, host, path
 
 
-class RsyncError(Exception):
-
-    """The error type that's raised if rsync exits with non-zero status."""
-
-    pass
-
-
-class MoveError(Exception):
-
-    """Raised if the `mv ... && rm ... && ln ...` command exits non-zero."""
-
-    pass
-
-
 def snapshot(source, dest, debug=False, compress=True, exclude=None):
     # Make sure source ends with / because this affects how rsync behaves.
     if not source.endswith(os.sep):
@@ -126,7 +149,7 @@ def snapshot(source, dest, debug=False, compress=True, exclude=None):
         for pattern in exclude:
             rsync_options.append("--exclude '%s'" % pattern)
 
-    rsync_cmd = "rsync %s '%s' " % (' '.join(rsync_options), source)
+    rsync_cmd = "rsync %s %s " % (' '.join(rsync_options), source)
     if host is not None:
         if user is not None:
             rsync_cmd += "%s@" % user
@@ -141,24 +164,25 @@ def snapshot(source, dest, debug=False, compress=True, exclude=None):
         if user is not None:
             mv_cmd += "%s@" % user
         mv_cmd += '%s "' % host
-    mv_cmd += "mv %s/incomplete.snapshot %s/%s.snapshot " % (
+    mv_cmd += "mv %s/incomplete.snapshot %s/%s.snapshot" % (
         snapshots_root, snapshots_root, date)
-    mv_cmd += "&& rm -f %s/latest.snapshot " % snapshots_root
-    mv_cmd += "&& ln -s %s.snapshot %s/latest.snapshot" % (
-        date, snapshots_root)
     if host is not None:
         mv_cmd += '"'
 
+    rm_cmd = "rm -f %s/latest.snapshot" % snapshots_root
+    ln_cmd = "ln -s %s.snapshot %s/latest.snapshot" % (
+        date, snapshots_root)
+
     print(rsync_cmd)
-    exit_status = _run(rsync_cmd)
-    if exit_status != 0:
-        raise RsyncError(exit_status)
+    _run(rsync_cmd)
 
     if not debug:
         print(mv_cmd)
-        exit_status = _run(mv_cmd)
-        if exit_status != 0:
-            raise MoveError(exit_status)
+        _run(mv_cmd)
+        print(rm_cmd)
+        _run(rm_cmd)
+        print(ln_cmd)
+        _run(ln_cmd)
 
 
 class CommandLineArgumentsError(Exception):
@@ -207,7 +231,7 @@ def main():
         sys.exit(err.message)
     try:
         snapshot(src, dest, debug, exclude)
-    except (RsyncError, MoveError) as err:
+    except (CalledProcessError, NoSuchCommandError) as err:
         sys.exit(err.message)
 
 
