@@ -10,14 +10,14 @@ import sys
 import os
 import logging
 import subprocess
-from optparse import OptionParser
+import optparse
 
 
 def _run(command):
     """Run the given command as a subprocess.
 
     We wrap subprocess.call() in our own function to make it easy for tests
-    to patch it.
+    to patch this funtion.
 
     """
     return subprocess.call(command, shell=True)
@@ -27,7 +27,7 @@ def _datetime():
     """Return the current datetime as a string.
 
     We wrap datetime.datetime.now() instead of calling it directly to make
-    it easy for tests to patch it.
+    it easy for tests to patch this funtion.
 
     """
     return datetime.datetime.now().strftime("%Y-%m-%dT%H_%M_%S")
@@ -199,7 +199,7 @@ def _parse_cli(args=None):
     if args is None:
         args = sys.argv[1:]
 
-    parser = OptionParser(usage="usage: %prog [options] SRC DEST")
+    parser = optparse.OptionParser(usage="usage: %prog [options] SRC DEST")
     parser.add_option(
         '-d', '--debug', '-n', '--dry-run', dest='debug', action='store_true',
         default=False,
