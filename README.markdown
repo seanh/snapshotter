@@ -55,9 +55,6 @@ mount-point encountered in SRC there will be just an empty directory in DEST.
 If symlinks are encountered in SRC, the symlinks themselves are copied to the
 snapshot, not the files or directories that the symlinks refer to.
 
-Progress is printed to stdout as snapshots are made, and an itemized
-change-summary is printed, suitable for redirecting to a log file.
-
 To restore selected files just copy them back from a snapshot directory to the
 live system. To restore an entire snapshot just copy the entire snapshot
 directory back to the live system.
@@ -169,21 +166,3 @@ Options
 
 `-d` or `--debug` or `-n` or `--dry-run`  
 Perform a trial-run with no changes made, passes the `--dry-run` option to rsync.
-
-TODO
-----
-
-Backup multiple sources to one dest: snapshotter SRC1 SRC2 SRC3 ... DEST.
-Just pass all the sources and then the dest to the rsync command.
-
-Specify multiple --link-dest arguments (one for every snapshot directory in
-DEST) to save bandwidth/storage?
-
-Store log files in DEST dirs. If DEST is local you can simply redirect rsync's
-output. If it's remote, you would have to log to a temporary file then scp the
-temp file to DEST.
-
-Default SRC and DEST dirs? So you can just do `snapshotter SRC` or just
-`snapshotter`.
-
-How-to for encrypting and compressing backup dirs.
