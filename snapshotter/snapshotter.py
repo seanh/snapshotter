@@ -8,7 +8,6 @@ See README.markdown for instructions.
 import datetime
 import sys
 import os
-import logging
 import subprocess
 import optparse
 
@@ -62,27 +61,18 @@ def _parse_rsync_arg(arg):
                     '/media/BACKUP' in the local path '/media/BACKUP'.
 
     """
-    logger = logging.getLogger("snapshotter._parse_rsync_arg")
-    logger.debug("Parsing rsync arg %s", arg)
     if _is_remote(arg):
-        logger.debug("This is a remote path")
         before_first_colon, after_first_colon = arg.split(':', 1)
         if '@' in before_first_colon:
-            logger.debug("User is specified in the path")
             user = before_first_colon.split('@')[0]
         else:
-            logger.debug("User is not specified in the path")
             user = None
         host = before_first_colon.split('@')[-1]
         path = after_first_colon
     else:
-        logger.debug("This is a local path.")
         user = None
         host = None
         path = os.path.abspath(os.path.expanduser(arg))
-    logger.debug("User: %s", user)
-    logger.debug("Host: %s", host)
-    logger.debug("Path: %s", path)
     return user, host, path
 
 
@@ -102,20 +92,11 @@ class MoveError(Exception):
 
 def snapshot(source, dest, debug=False, compress=True, fuzzy=True,
              progress=True, exclude=None):
-    logger = logging.getLogger("snapshotter.snapshot")
-
-    if debug:
-        logging.basicConfig(level=logging.DEBUG)
-
     # Make sure source ends with / because this affects how rsync behaves.
     if not source.endswith(os.sep):
         source += os.sep
 
-    logger.debug("source is: %s", source)
-    logger.debug("dest is: %s", dest)
-
     date = _datetime()
-    logger.debug("date is: %s", date)
 
     user, host, snapshots_root = _parse_rsync_arg(dest)
 
