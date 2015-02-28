@@ -34,10 +34,10 @@ class NoSuchCommandError(Exception):
 
 
 def _run(command):
-    """Run the given command as a subprocess and return its stdout output.
+    """Run the given command as a subprocess and return its output.
 
     This redirects the subprocess's stderr to stdout so the returned string
-    could contain everything printed to stdout and stderr together.
+    should contain everything written to stdout and stderr together.
 
     :raises CalledProcessError: If running the command fails or the command
         exits with non-zero status. The command's stdout and stderr will be
@@ -47,8 +47,7 @@ def _run(command):
 
     """
     try:
-        return subprocess.check_output(
-            command, stderr=subprocess.STDOUT)
+        return subprocess.check_output(command, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as err:
         raise CalledProcessError(
             ' '.join(command), err.output, err.returncode)
@@ -117,6 +116,12 @@ def _rsync(source, dest, debug=False, exclude=None):
 
 
 def _wrap_in_ssh(command, user, host):
+    """Return the given command with ssh prepended to run it remotely.
+
+    For example for ["mv", "source", "dest"] return
+    ["ssh", "user@host", "mv", "source", "dest"].
+
+    """
     if not host:
         # We aren't dealing with a remote destination so there's no need
         # to wrap the command in an ssh command.
@@ -132,42 +137,57 @@ def _wrap_in_ssh(command, user, host):
     return ssh_command
 
 
-def _mv(src, dest, user=None, host=None):
-    mv_cmd = _wrap_in_ssh(["mv", src, dest], user, host)
-    print(mv_cmd)
-    _run(mv_cmd)
-
-
 def _move_incomplete_dir(snapshots_root, date, user=None, host=None,
                          debug=False):
+    """Move the incomplete.snapshot dir to YYYY-MM-DDTHH_MM_SS.snapshot.
+
+    If snapshots_root is a remote path move the directory remotely
+    by running `ssh [user@]host mv ...`.
+
+    """
     src = "%s/incomplete.snapshot" % snapshots_root
     dest = "%s/%s.snapshot" % (snapshots_root, date)
+    mv_cmd = _wrap_in_ssh(["mv", src, dest], user, host)
     if not debug:
-        _mv(src, dest, user, host)
+        print(mv_cmd)
+        _run(mv_cmd)
 
 
-def _rm(file_, user=None, host=None):
-    command = _wrap_in_ssh(["rm", "-f", file_], user, host)
+def _rm(path, user=None, host=None):
+    """Remove the given filesystem path.
+
+    If path is a remote path remove it remotely by running
+    `ssh [user@]host rm ...`.
+
+    """
+    command = _wrap_in_ssh(["rm", "-f", path], user, host)
     print(command)
     _run(command)
 
 
-def _remove_latest_symlink(snapshots_root, user=None, host=None):
-    _rm("%s/latest.snapshot" % snapshots_root, user, host)
+def _ln(target, link_path, user=None, host=None):
+    """Create a symlink to the given target of the given link path.
 
+    If link_path is a remote path then create the symlink remotely by running
+    `ssh [user@]host ln -s ...`.
 
-def _ln(target, link_name, user=None, host=None):
-    command = _wrap_in_ssh(["ln", "-s", target, link_name], user, host)
+    """
+    command = _wrap_in_ssh(["ln", "-s", target, link_path], user, host)
     print(command)
     _run(command)
 
 
 def _update_latest_symlink(date, snapshots_root, user=None, host=None,
                            debug=False):
+    """Update the latest.snapshot symlink to point to the new  snapshot.
+
+    If snapshots_root is a remote directory then update the symlink remotely.
+
+    """
     target = "%s.snapshot" % date
     link_name = "%s/latest.snapshot" % snapshots_root
     if not debug:
-        _remove_latest_symlink(snapshots_root, user, host)
+        _rm("%s/latest.snapshot" % snapshots_root, user, host)
         _ln(target, link_name, user, host)
 
 
