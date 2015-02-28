@@ -116,6 +116,35 @@ def _rsync(source, dest, debug=False, exclude=None):
     _run(rsync_cmd)
 
 
+def _wrap_in_ssh(command, user, host):
+    if not host:
+        # We aren't dealing with a remote destination so there's no need
+        # to wrap the command in an ssh command.
+        return command
+
+    ssh_command = ["ssh"]
+    host_part = ""
+    if user is not None:
+        host_part += "%s@" % user
+    host_part += host
+    ssh_command.append(host_part)
+    ssh_command.extend(command)
+    return ssh_command
+
+
+def _mv(src, dest, user, host):
+    mv_cmd = _wrap_in_ssh(["mv", src, dest], user, host)
+    print(mv_cmd)
+    _run(mv_cmd)
+
+
+def _move_incomplete_dir(snapshots_root, date, user, host, debug=False):
+    src = "%s/incomplete.snapshot" % snapshots_root
+    dest = "%s/%s.snapshot" % (snapshots_root, date)
+    if not debug:
+        _mv(src, dest, user, host)
+
+
 def _datetime():
     """Return the current datetime as a string.
 
@@ -175,36 +204,18 @@ def snapshot(source, dest, debug=False, compress=True, exclude=None):
 
     user, host, snapshots_root = _parse_rsync_arg(dest)
 
-    def _wrap_in_ssh(command):
-        if not host:
-            # We aren't dealing with a remote destination so there's no need
-            # to wrap the command in an ssh command.
-            return command
-
-        ssh_command = ["ssh"]
-        host_part = ""
-        if user is not None:
-            host_part += "%s@" % user
-        host_part += host
-        ssh_command.append(host_part)
-        ssh_command.extend(command)
-        return ssh_command
-
-    mv_src = "%s/incomplete.snapshot" % snapshots_root
-    mv_dest = "%s/%s.snapshot" % (snapshots_root, date)
-    mv_cmd = _wrap_in_ssh(["mv", mv_src, mv_dest])
-
-    rm_cmd = _wrap_in_ssh(["rm", "-f", "%s/latest.snapshot" % snapshots_root])
+    rm_cmd = _wrap_in_ssh(
+        ["rm", "-f", "%s/latest.snapshot" % snapshots_root], user, host)
 
     ln_cmd = _wrap_in_ssh(
         ["ln", "-s", "%s.snapshot" % date,
-         "%s/latest.snapshot" % snapshots_root])
+         "%s/latest.snapshot" % snapshots_root],
+        user, host)
 
     _rsync(source, dest, debug, exclude)
+    _move_incomplete_dir(snapshots_root, date, user, host, debug)
 
     if not debug:
-        print(mv_cmd)
-        _run(mv_cmd)
         print(rm_cmd)
         _run(rm_cmd)
         print(ln_cmd)
