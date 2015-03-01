@@ -303,8 +303,7 @@ class CommandLineArgumentsError(Exception):
 
 def _parse_cli(args=None):
     """Parse the command-line arguments."""
-    if args is None:
-        args = sys.argv[1:]
+    args = args if args is not None else sys.argv[1:]
 
     parser = optparse.OptionParser(usage="usage: %prog [options] SRC DEST")
     parser.add_option(
