@@ -102,7 +102,7 @@ def _rsync(source, dest, debug=False, exclude=None):
 
     rsync_cmd.append(source)
 
-    user, host, snapshots_root = _parse_rsync_arg(dest)
+    user, host, snapshots_root = _parse_path(dest)
     dest = ''
     if host is not None:
         if user is not None:
@@ -201,37 +201,49 @@ def _datetime():
     return datetime.datetime.now().strftime("%Y-%m-%dT%H_%M_%S")
 
 
-def _is_remote(src_or_dest):
-    """Return True if src_or_dest is a remote path, False otherwise.
+def _is_remote(path):
+    """Return True if the given path is a remote path, False otherwise.
 
-    :param src_or_dest: an rsync source or destination argument
-        (as you would pass to rsync on the command line)
+    :param path: a local or remote path as would be used in an rsync SRC or
+        DEST argument on the command-line
 
     """
     # If it has a : before the first / then it's a remote path.
-    return ':' in src_or_dest.split('/')[0]
+    return ':' in path.split('/')[0]
 
 
-def _parse_rsync_arg(arg):
-    """Parse the given rsync SRC or DEST argument.
+def _parse_path(path):
+    """Parse the given local or remote path and return its parts.
 
-    Return a tuple containing the user, host and path parts of the argument.
 
-    user    :       The username in a remote path spec.
-                    'seanh' in 'seanh@mydomain.org:/path/to/backups'.
-                    None if arg is a local path or a remote path without a
-                    username.
-    host    :       The hostname in a remote path spec.
-                    'mydomain.org' in 'seanh@mydomain.org:/path/to/backups'.
-                    None if arg is a local path.
-    path    :       The path in a local or remote path spec.
-                    '/path/to/backups' in the remote path
-                    'seanh@mydomain.org:/path/to/backups'.
-                    '/media/BACKUP' in the local path '/media/BACKUP'.
+    :param path: a local or remote path as would be used in an rsync SRC or
+        DEST argument on the command-line
+
+    :returns: A 3-tuple (user, host, path) of the username, hostname and path
+        parts of the given path. Both user and host may be None.
+        user may be None while host is not None.
+
+    For example:
+
+        "seanh@mydomain.org:/path/to/backups" ->
+            ("seanh", "mydomain.org", "/path/to/backups")
+
+        "mydomain.org:/path/to/backups" ->
+            (None, "mydomain.org", "/path/to/backups")
+
+        "/path/to/backups" ->
+            (None, None, "/path/to/backups")
+
+    When user and host are both None, then relative paths will be expanded
+    to absolute paths and ~ will be expanded to the path to the user's home
+    directory:
+
+        "~/path/to/backups" ->
+            (None, None, "/home/seanh/path/to/backups")
 
     """
-    if _is_remote(arg):
-        before_first_colon, after_first_colon = arg.split(':', 1)
+    if _is_remote(path):
+        before_first_colon, after_first_colon = path.split(':', 1)
         if '@' in before_first_colon:
             user = before_first_colon.split('@')[0]
         else:
@@ -241,7 +253,7 @@ def _parse_rsync_arg(arg):
     else:
         user = None
         host = None
-        path = os.path.abspath(os.path.expanduser(arg))
+        path = os.path.abspath(os.path.expanduser(path))
     return user, host, path
 
 
@@ -288,7 +300,7 @@ def snapshot(source, dest, debug=False, exclude=None):
 
     """
     date = _datetime()
-    user, host, snapshots_root = _parse_rsync_arg(dest)
+    user, host, snapshots_root = _parse_path(dest)
     _rsync(source, dest, debug, exclude)
     _move_incomplete_dir(snapshots_root, date, user, host, debug)
     _update_latest_symlink(date, snapshots_root, user, host, debug)

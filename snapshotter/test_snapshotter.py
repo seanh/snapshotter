@@ -16,7 +16,7 @@ def _this_directory():
 
 class TestRun(object):
 
-    """Tests for the _run() function."""
+    """Unit tests for the _run() function."""
 
     def test_success_with_stdout(self):
         output = snapshotter._run("echo foo".split())
