@@ -29,9 +29,7 @@ class TestRun(object):
             assert False
         except snapshotter.CalledProcessError as err:
             assert err.command == command
-            assert err.output == (
-                "rsync: --foobar: unknown option\nrsync error: syntax or "
-                "usage error (code 1) at main.c(1572) [client=3.1.0]\n")
+            assert err.output.startswith("rsync: --foobar: unknown option")
             assert err.exit_value == 1
 
     def test_command_does_not_exist(self):
