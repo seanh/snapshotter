@@ -10,6 +10,7 @@ import sys
 import os
 import subprocess
 import optparse
+import re
 
 
 class CalledProcessError(Exception):
@@ -56,6 +57,13 @@ def _run(command):
             raise NoSuchCommandError(' '.join(command), err.strerror)
         else:
             raise
+
+
+class NoSpaceLeftOnDeviceError(Exception):
+
+    """Exception that's raised if rsync fails with "No space left on device"""
+
+    pass
 
 
 def _rsync(source, dest, debug=False, exclude=None):
@@ -112,7 +120,13 @@ def _rsync(source, dest, debug=False, exclude=None):
     rsync_cmd.append(dest)
 
     print(rsync_cmd)
-    _run(rsync_cmd)
+    try:
+        _run(rsync_cmd)
+    except CalledProcessError as err:
+        if err.exit_value == 11 and "No space left on device" in err.output:
+            raise NoSpaceLeftOnDeviceError(err.message)
+        else:
+            raise
 
 
 def _wrap_in_ssh(command, user, host):
@@ -153,14 +167,17 @@ def _move_incomplete_dir(snapshots_root, date, user=None, host=None,
         _run(mv_cmd)
 
 
-def _rm(path, user=None, host=None):
+def _rm(path, user=None, host=None, directory=False):
     """Remove the given filesystem path.
 
     If path is a remote path remove it remotely by running
     `ssh [user@]host rm ...`.
 
     """
-    command = _wrap_in_ssh(["rm", "-f", path], user, host)
+    command = ["rm", "-f", path]
+    if directory:
+        command.insert(1, "-r")
+    command = _wrap_in_ssh(command, user, host)
     print(command)
     _run(command)
 
@@ -257,7 +274,50 @@ def _parse_path(path):
     return user, host, path
 
 
-def snapshot(source, dest, debug=False, exclude=None):
+def _ls_snapshots(dest):
+    """Return a sorted list of the snapshot directories in directory dest.
+
+    Snapshots are sorted oldest-first, going by the date in their
+    YYYY-MM-DDTHH_MM_SS.snapshot filename.
+
+    """
+    pattern = "[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}_[0-9]{2}_[0-9]{2}.snapshot"
+    snapshots = [os.path.join(dest, d) for d in os.listdir(dest)
+                 if os.path.isdir(os.path.join(dest, d)) and
+                 re.match(pattern, d)]
+    return sorted(snapshots)
+
+
+class NoMoreSnapshotsToRemoveError(Exception):
+
+    """Exception that's raised if there's no more snapshots to delete.
+
+    Raised if there's no space left on the target device and there are less
+    than or equal to --min-snapshots (default: 3) existing snapshots so we
+    can't delete any to make space.
+
+    """
+    pass
+
+
+def _remove_oldest_snapshot(dest, user=None, host=None, min_snapshots=3):
+    """Remove the oldest snapshot directory from dest.
+
+    Raises NoMoreSnapshotsToRemoveError is the number of snapshots in dest is
+    less than or equal to min_snapshots.
+
+    """
+    snapshots = _ls_snapshots(dest)
+    if len(snapshots <= min_snapshots):
+        raise NoMoreSnapshotsToRemoveError
+    else:
+        oldest_snapshot = snapshots[0]
+        print("Removing oldest snapshot {s}".format(s=oldest_snapshot))
+        if not debug:
+            _rm(oldest_snapshot, user, host, directory=True)
+
+
+def snapshot(source, dest, debug=False, exclude=None, min_snapshots=3):
     """Make a new snapshot of source in dest.
 
     Make a new snapshot means:
@@ -301,7 +361,13 @@ def snapshot(source, dest, debug=False, exclude=None):
     """
     date = _datetime()
     user, host, snapshots_root = _parse_path(dest)
-    _rsync(source, dest, debug, exclude)
+    while True:
+        try:
+            _rsync(source, dest, debug, exclude)
+            break
+        except NoSpaceLeftOnDeviceError:
+            _remove_oldest_snapshot(
+                snapshots_root, user, host, min_snapshots=min_snapshots)
     _move_incomplete_dir(snapshots_root, date, user, host, debug)
     _update_latest_symlink(date, snapshots_root, user, host, debug)
 
