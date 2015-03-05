@@ -11,6 +11,11 @@ import os
 import subprocess
 import argparse
 import re
+import logging
+
+
+def _info(message):
+    logging.getLogger("snapshotter").info(message)
 
 
 class CalledProcessError(Exception):
@@ -47,6 +52,7 @@ def _run(command):
     :raises NoSuchCommandError: If the command doesn't exist.
 
     """
+    _info(" ".join(command))
     try:
         return subprocess.check_output(command, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as err:
@@ -116,7 +122,7 @@ def _rsync(source, dest, debug=False, extra_args=None):
     dest += "%s/incomplete.snapshot" % snapshots_root
     rsync_cmd.append(dest)
 
-    print(rsync_cmd)
+    _info("Running rsync")
     try:
         _run(rsync_cmd)
     except CalledProcessError as err:
@@ -160,7 +166,7 @@ def _move_incomplete_dir(snapshots_root, date, user=None, host=None,
     dest = "%s/%s.snapshot" % (snapshots_root, date)
     mv_cmd = _wrap_in_ssh(["mv", src, dest], user, host)
     if not debug:
-        print(mv_cmd)
+        _info("Moving incomplete.snapshot")
         _run(mv_cmd)
 
 
@@ -175,7 +181,6 @@ def _rm(path, user=None, host=None, directory=False):
     if directory:
         command.insert(1, "-r")
     command = _wrap_in_ssh(command, user, host)
-    print(command)
     _run(command)
 
 
@@ -187,7 +192,6 @@ def _ln(target, link_path, user=None, host=None):
 
     """
     command = _wrap_in_ssh(["ln", "-s", target, link_path], user, host)
-    print(command)
     _run(command)
 
 
@@ -200,6 +204,7 @@ def _update_latest_symlink(date, snapshots_root, user=None, host=None,
     """
     target = "%s.snapshot" % date
     link_name = "%s/latest.snapshot" % snapshots_root
+    _info("Updating latest.snapshot symlink")
     if not debug:
         _rm("%s/latest.snapshot" % snapshots_root, user, host)
         _ln(target, link_name, user, host)
@@ -310,7 +315,7 @@ def _remove_oldest_snapshot(dest, user=None, host=None, min_snapshots=3,
         raise NoMoreSnapshotsToRemoveError
     else:
         oldest_snapshot = snapshots[0]
-        print("Removing oldest snapshot {s}".format(s=oldest_snapshot))
+        _info("Removing oldest snapshot")
         if not debug:
             _rm(oldest_snapshot, user, host, directory=True)
 
@@ -411,6 +416,7 @@ def main():
     non-zero exit status and an error message printed, instead of stack traces.
 
     """
+    logging.basicConfig(level=logging.INFO)
     try:
         args = _parse_cli()
     except CommandLineArgumentsError as err:
