@@ -396,6 +396,11 @@ def _parse_cli(args=None):
         action='append',
         help="Exclude files matching PATTERN, e.g. --exclude '.git/*' (see "
              "the --exclude option in `man rsync`)")
+    parser.add_option(
+        '--min-snapshots', type='int', dest='min_snapshots',
+        help="The minimum number of snapshots to leave behind when rolling "
+             "out old snapshots to make space for new ones (default: 3)",
+        default=3)
     (options, args) = parser.parse_args(args)
 
     if len(args) != 2:
@@ -403,7 +408,7 @@ def _parse_cli(args=None):
 
     src = args[0]
     dest = args[1]
-    return (src, dest, options.debug, options.exclude)
+    return (src, dest, options.debug, options.exclude, options.min_snapshots)
 
 
 def main():
@@ -414,11 +419,11 @@ def main():
 
     """
     try:
-        src, dest, debug, exclude = _parse_cli()
+        src, dest, debug, exclude, min_snapshots = _parse_cli()
     except CommandLineArgumentsError as err:
         sys.exit(err.message)
     try:
-        snapshot(src, dest, debug, exclude)
+        snapshot(src, dest, debug, exclude, min_snapshots)
     except (CalledProcessError, NoSuchCommandError) as err:
         sys.exit(err.message)
 
