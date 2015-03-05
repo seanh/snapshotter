@@ -39,7 +39,7 @@ class NoSuchCommandError(Exception):
         self.command = command
 
 
-def _run(command):
+def _run(command, debug=False):
     """Run the given command as a subprocess and return its output.
 
     This redirects the subprocess's stderr to stdout so the returned string
@@ -53,6 +53,8 @@ def _run(command):
 
     """
     _info(" ".join(command))
+    if debug:
+        return
     try:
         return subprocess.check_output(command, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as err:
@@ -165,12 +167,11 @@ def _move_incomplete_dir(snapshots_root, date, user=None, host=None,
     src = "%s/incomplete.snapshot" % snapshots_root
     dest = "%s/%s.snapshot" % (snapshots_root, date)
     mv_cmd = _wrap_in_ssh(["mv", src, dest], user, host)
-    if not debug:
-        _info("Moving incomplete.snapshot")
-        _run(mv_cmd)
+    _info("Moving incomplete.snapshot")
+    _run(mv_cmd, debug=debug)
 
 
-def _rm(path, user=None, host=None, directory=False):
+def _rm(path, user=None, host=None, directory=False, debug=False):
     """Remove the given filesystem path.
 
     If path is a remote path remove it remotely by running
@@ -181,10 +182,10 @@ def _rm(path, user=None, host=None, directory=False):
     if directory:
         command.insert(1, "-r")
     command = _wrap_in_ssh(command, user, host)
-    _run(command)
+    _run(command, debug=debug)
 
 
-def _ln(target, link_path, user=None, host=None):
+def _ln(target, link_path, user=None, host=None, debug=False):
     """Create a symlink to the given target of the given link path.
 
     If link_path is a remote path then create the symlink remotely by running
@@ -192,7 +193,7 @@ def _ln(target, link_path, user=None, host=None):
 
     """
     command = _wrap_in_ssh(["ln", "-s", target, link_path], user, host)
-    _run(command)
+    _run(command, debug=debug)
 
 
 def _update_latest_symlink(date, snapshots_root, user=None, host=None,
@@ -205,9 +206,8 @@ def _update_latest_symlink(date, snapshots_root, user=None, host=None,
     target = "%s.snapshot" % date
     link_name = "%s/latest.snapshot" % snapshots_root
     _info("Updating latest.snapshot symlink")
-    if not debug:
-        _rm("%s/latest.snapshot" % snapshots_root, user, host)
-        _ln(target, link_name, user, host)
+    _rm("%s/latest.snapshot" % snapshots_root, user, host, debug=debug)
+    _ln(target, link_name, user, host, debug=debug)
 
 
 def _datetime():
@@ -316,8 +316,7 @@ def _remove_oldest_snapshot(dest, user=None, host=None, min_snapshots=3,
     else:
         oldest_snapshot = snapshots[0]
         _info("Removing oldest snapshot")
-        if not debug:
-            _rm(oldest_snapshot, user, host, directory=True)
+        _rm(oldest_snapshot, user, host, directory=True, debug=debug)
 
 
 def snapshot(source, dest, debug=False, min_snapshots=3, extra_args=None):

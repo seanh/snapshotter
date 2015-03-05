@@ -165,7 +165,6 @@ class TestFunctional(object):
 def _get_args(call_args):
     """Return the arg string passed to a mock _run() function."""
     positional_args, keyword_args = call_args
-    assert keyword_args == {}
     assert len(positional_args) == 1
     return positional_args[0]
 
@@ -196,12 +195,11 @@ class TestSnapshot(object):
 
         snapshotter.snapshot(src, dst, debug=True)
 
-        assert self.mock_run_function.call_count == 1, (
-            "When snapshot() is given the -n/--dry-run arg it should only run "
-            "one command (rsync) - the mv command shouldn't be run")
-        args = _get_args(self.mock_run_function.call_args)
+        args = _get_args(self.mock_run_function.call_args_list[0])
         assert "--dry-run" in args, (
             "snapshot() should pass the -n/--dry-run argument on to rsync")
+        for call in self.mock_run_function.call_args_list[1:]:
+            assert call[1].get("debug") is True
 
     def test_not_passing_dry_run_to_rsync(self):
         """If --n isn't given to snapshotter it shouldn't be given to rsync."""
@@ -472,7 +470,8 @@ class TestRemovingOldSnapshots(object):
 
         assert self.mock_rm_function.call_count == 2
         assert self.mock_rm_function.call_args_list[0] == mock.call(
-            '2015-03-05T16_23_12.snapshot', None, None, directory=True)
+            '2015-03-05T16_23_12.snapshot', None, None, debug=False,
+            directory=True)
 
         assert self.mock_rsync_function.call_count == 2
 
@@ -509,11 +508,14 @@ class TestRemovingOldSnapshots(object):
 
         assert self.mock_rm_function.call_count == 4
         assert self.mock_rm_function.call_args_list[0] == mock.call(
-            '2015-03-05T16_23_12.snapshot', None, None, directory=True)
+            '2015-03-05T16_23_12.snapshot', None, None, debug=False,
+            directory=True)
         assert self.mock_rm_function.call_args_list[1] == mock.call(
-            '2015-03-05T16_24_15.snapshot', None, None, directory=True)
+            '2015-03-05T16_24_15.snapshot', None, None, debug=False,
+            directory=True)
         assert self.mock_rm_function.call_args_list[2] == mock.call(
-            '2015-03-05T16_25_09.snapshot', None, None, directory=True)
+            '2015-03-05T16_25_09.snapshot', None, None, debug=False,
+            directory=True)
 
         assert self.mock_rsync_function.call_count == 4
 
@@ -557,9 +559,11 @@ class TestRemovingOldSnapshots(object):
 
         assert self.mock_rm_function.call_count == 2
         assert self.mock_rm_function.call_args_list[0] == mock.call(
-            '2015-03-05T16_23_12.snapshot', None, None, directory=True)
+            '2015-03-05T16_23_12.snapshot', None, None, debug=False,
+            directory=True)
         assert self.mock_rm_function.call_args_list[1] == mock.call(
-            '2015-03-05T16_24_15.snapshot', None, None, directory=True)
+            '2015-03-05T16_24_15.snapshot', None, None, debug=False,
+            directory=True)
 
         assert self.mock_rsync_function.call_count == 3
 
