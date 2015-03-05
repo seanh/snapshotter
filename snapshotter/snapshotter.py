@@ -395,8 +395,7 @@ def _parse_cli(args=None):
     parser.add_argument("SRC", help="the path to be backed up")
     parser.add_argument("DEST", help="the directory to create snapshots in")
     parser.add_argument(
-        '-d', '--debug', '-n', '--dry-run', dest='debug', action='store_true',
-        default=False,
+        '-n', '--dry-run', dest='debug', action='store_true', default=False,
         help="Perform a trial-run with no changes made (pass the --dry-run "
              "option to rsync)")
     parser.add_argument(
