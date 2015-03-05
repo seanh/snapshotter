@@ -114,7 +114,7 @@ class TestCLI(object):
             args=["/home/fred"])
 
     def test_with_default_options(self):
-        src, dest, debug, min_snapshots, extra_args = (
+        src, dest, debug, _, extra_args = (
             snapshotter._parse_cli(args=["/home/fred", "/media/backup"]))
         assert src == "/home/fred"
         assert dest == "/media/backup"
@@ -164,7 +164,7 @@ class TestFunctional(object):
 
 def _get_args(call_args):
     """Return the arg string passed to a mock _run() function."""
-    positional_args, keyword_args = call_args
+    positional_args, _ = call_args
     assert len(positional_args) == 1
     return positional_args[0]
 
@@ -258,7 +258,7 @@ class TestSnapshot(object):
             a for a in args if a.startswith("--link-dest")]
         assert len(link_dest_args) == 1
         link_dest_arg = link_dest_args[0]
-        name, value = link_dest_arg.split("=")
+        _, value = link_dest_arg.split("=")
         assert value == "../latest.snapshot"
 
     def test_relative_local_to_relative_local(self):
@@ -296,7 +296,6 @@ class TestSnapshot(object):
 
         args = _get_args(self.mock_run_function.call_args_list[0])
         src_arg = args[-2]
-        dst_arg = args[-1]
         assert src_arg == "~/"
 
     def test_root_as_source(self):
@@ -419,6 +418,7 @@ class TestSnapshot(object):
         for arg in extra_args:
             assert arg in self.mock_run_function.call_args_list[0][0][0]
 
+
 class TestRemovingOldSnapshots(object):
 
     """Tests for removing old snapshots when out of space for new ones."""
@@ -488,10 +488,10 @@ class TestRemovingOldSnapshots(object):
         self.mock_ls_snapshots_function.return_value = snapshots
 
         rsync_returns = [
-                snapshotter.NoSpaceLeftOnDeviceError(),
-                snapshotter.NoSpaceLeftOnDeviceError(),
-                snapshotter.NoSpaceLeftOnDeviceError(),
-                None]
+            snapshotter.NoSpaceLeftOnDeviceError(),
+            snapshotter.NoSpaceLeftOnDeviceError(),
+            snapshotter.NoSpaceLeftOnDeviceError(),
+            None]
         def rsync(*args, **kwargs):
             result = rsync_returns.pop(0)
             if isinstance(result, Exception):
