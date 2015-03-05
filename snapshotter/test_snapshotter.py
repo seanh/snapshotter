@@ -37,6 +37,68 @@ class TestRun(object):
             snapshotter.NoSuchCommandError, snapshotter._run, "bar")
 
 
+class TestRsync(object):
+
+    """Unit tests for the _rsync() function."""
+
+    @mock.patch("snapshotter.snapshotter._run")
+    def test_rsync_raises_NoSpaceLeftOnDevice(self, mock_run_function):
+        """NoSpaceLeftOnDeviceError should be raised for rsync no space error.
+
+        If rsync exits with status 11 and a "No space left on device" error,
+        _rsync() should raise NoSpaceLeftOnDeviceError.
+
+        """
+        mock_run_function.side_effect = snapshotter.CalledProcessError(
+            command="rsync ...",
+            output='rsync: write failed on "/media/seanh/foo/Hypothesis/Co-'
+                   'ment ~ Philippe Aigrain @ I Annotate 2014 (HD).mp4": No '
+                   'space left on device (28)\n'
+                   'rsync error: error in file IO (code 11) at receiver.c(389)'
+                   ' [receiver=3.1.0]',
+            exit_value=11)
+
+        nose.tools.assert_raises(
+            snapshotter.NoSpaceLeftOnDeviceError,
+            snapshotter._rsync, "source", "dest")
+
+    @mock.patch("snapshotter.snapshotter._run")
+    def test_rsync_raises_CalledProcessError(self, mock_run_function):
+        """CalledProcessError should be raised for other rsync errors.
+
+        If rsync exits with any status 11 and something other than a
+        "no space left on device" error, _rsync() should raise
+        CalledProcessError.
+
+        """
+        mock_run_function.side_effect = snapshotter.CalledProcessError(
+            command="rsync ...",
+            output="Some other rsync error",
+            exit_value=11)
+
+        nose.tools.assert_raises(
+            snapshotter.CalledProcessError,
+            snapshotter._rsync, "source", "dest")
+
+    @mock.patch("snapshotter.snapshotter._run")
+    def test_rsync_raises_CalledProcessError_other_exit_value(
+            self, mock_run_function):
+        """CalledProcessError should be raised for other rsync errors.
+
+        If rsync exits with a non-zero status other than 11, _rsync() should
+        raise CalledProcessError.
+
+        """
+        mock_run_function.side_effect = snapshotter.CalledProcessError(
+            command="rsync ...",
+            output="Some other rsync error",
+            exit_value=13)
+
+        nose.tools.assert_raises(
+            snapshotter.CalledProcessError,
+            snapshotter._rsync, "source", "dest")
+
+
 class TestCLI(object):
 
     """Tests for the parse_cli() function."""
@@ -64,20 +126,6 @@ class TestCLI(object):
             _, _, debug, _ = snapshotter._parse_cli(
                 args=[option, "/home/fred", "/media/backup"])
             assert debug is True
-
-
-class TestIsRemote(object):
-
-    """Unit tests for the is_remote() function."""
-
-    pass
-
-
-class TestParseRsyncArg(object):
-
-    """Unit tests for the _parse_path() function."""
-
-    pass
 
 
 class TestFunctional(object):
@@ -359,3 +407,177 @@ class TestSnapshot(object):
             assert False, "snapshot() should have raised an exception"
         except snapshotter.CalledProcessError as err:
             assert err.message == "output 25"
+
+
+class TestRemovingOldSnapshots(object):
+
+    """Tests for removing old snapshots when out of space for new ones."""
+
+    def setup(self):
+        self.run_patcher = mock.patch('snapshotter.snapshotter._run')
+        self.mock_run_function = self.run_patcher.start()
+        self.mock_run_function.return_value = 0
+
+        self.rsync_patcher = mock.patch('snapshotter.snapshotter._rsync')
+        self.mock_rsync_function = self.rsync_patcher.start()
+
+        self.rm_patcher = mock.patch('snapshotter.snapshotter._rm')
+        self.mock_rm_function = self.rm_patcher.start()
+
+        self.ls_snapshots_patcher = mock.patch(
+            'snapshotter.snapshotter._ls_snapshots')
+        self.mock_ls_snapshots_function = self.ls_snapshots_patcher.start()
+
+    def teardown(self):
+        self.run_patcher.stop()
+        self.rsync_patcher.stop()
+        self.rm_patcher.stop()
+        self.ls_snapshots_patcher.stop()
+
+    def test_removing_oldest_snapshot(self):
+        """If out of space it should remove oldest snapshot and rerun rsync."""
+
+        snapshots = [
+            "2015-03-05T16_23_12.snapshot",
+            "2015-03-05T16_24_15.snapshot",
+            "2015-03-05T16_25_09.snapshot",
+            "2015-03-05T16_27_09.snapshot",
+            "2015-03-05T16_28_09.snapshot",
+            "2015-03-05T16_29_09.snapshot",
+        ]
+        self.mock_ls_snapshots_function.return_value = snapshots
+
+        rsync_returns = [snapshotter.NoSpaceLeftOnDeviceError(), None]
+        def rsync(*args, **kwargs):
+            result = rsync_returns.pop(0)
+            if isinstance(result, Exception):
+                raise result
+            else:
+                return result
+        self.mock_rsync_function.side_effect = rsync
+
+        snapshotter.snapshot("source", "destination")
+
+        assert self.mock_rm_function.call_count == 2
+        assert self.mock_rm_function.call_args_list[0] == mock.call(
+            '2015-03-05T16_23_12.snapshot', None, None, directory=True)
+
+        assert self.mock_rsync_function.call_count == 2
+
+    def test_removing_multiple_snapshots(self):
+        """If out of space it should remove oldest snapshot and rerun rsync."""
+        snapshots = [
+            "2015-03-05T16_23_12.snapshot",
+            "2015-03-05T16_24_15.snapshot",
+            "2015-03-05T16_25_09.snapshot",
+            "2015-03-05T16_27_09.snapshot",
+            "2015-03-05T16_28_09.snapshot",
+            "2015-03-05T16_29_09.snapshot",
+        ]
+        self.mock_ls_snapshots_function.return_value = snapshots
+
+        rsync_returns = [
+                snapshotter.NoSpaceLeftOnDeviceError(),
+                snapshotter.NoSpaceLeftOnDeviceError(),
+                snapshotter.NoSpaceLeftOnDeviceError(),
+                None]
+        def rsync(*args, **kwargs):
+            result = rsync_returns.pop(0)
+            if isinstance(result, Exception):
+                raise result
+            else:
+                return result
+        self.mock_rsync_function.side_effect = rsync
+
+        def rm(*args, **kwargs):
+            snapshots.pop(0)
+        self.mock_rm_function.side_effect = rm
+
+        snapshotter.snapshot("source", "destination")
+
+        assert self.mock_rm_function.call_count == 4
+        assert self.mock_rm_function.call_args_list[0] == mock.call(
+            '2015-03-05T16_23_12.snapshot', None, None, directory=True)
+        assert self.mock_rm_function.call_args_list[1] == mock.call(
+            '2015-03-05T16_24_15.snapshot', None, None, directory=True)
+        assert self.mock_rm_function.call_args_list[2] == mock.call(
+            '2015-03-05T16_25_09.snapshot', None, None, directory=True)
+
+        assert self.mock_rsync_function.call_count == 4
+
+    def test_too_few_snapshots(self):
+        """It should crash if not enough space and too few snapshots to remove.
+
+        """
+        snapshots = [
+            "2015-03-05T16_23_12.snapshot",
+            "2015-03-05T16_24_15.snapshot",
+        ]
+        self.mock_ls_snapshots_function.return_value = snapshots
+
+        self.mock_rsync_function.side_effect = (
+            snapshotter.NoSpaceLeftOnDeviceError)
+
+        nose.tools.assert_raises(
+            snapshotter.NoMoreSnapshotsToRemoveError,
+            snapshotter.snapshot, "source", "destination")
+
+    def test_too_few_snapshots_after_removing_two(self):
+        snapshots = [
+            "2015-03-05T16_23_12.snapshot",
+            "2015-03-05T16_24_15.snapshot",
+            "2015-03-05T16_25_09.snapshot",
+            "2015-03-05T16_27_09.snapshot",
+            "2015-03-05T16_28_09.snapshot",
+        ]
+        self.mock_ls_snapshots_function.return_value = snapshots
+
+        self.mock_rsync_function.side_effect = (
+            snapshotter.NoSpaceLeftOnDeviceError)
+
+        def rm(*args, **kwargs):
+            snapshots.pop(0)
+        self.mock_rm_function.side_effect = rm
+
+        nose.tools.assert_raises(
+            snapshotter.NoMoreSnapshotsToRemoveError,
+            snapshotter.snapshot, "source", "destination")
+
+        assert self.mock_rm_function.call_count == 2
+        assert self.mock_rm_function.call_args_list[0] == mock.call(
+            '2015-03-05T16_23_12.snapshot', None, None, directory=True)
+        assert self.mock_rm_function.call_args_list[1] == mock.call(
+            '2015-03-05T16_24_15.snapshot', None, None, directory=True)
+
+        assert self.mock_rsync_function.call_count == 3
+
+    def test_with_no_snapshots(self):
+        self.mock_ls_snapshots_function.return_value = []
+
+        self.mock_rsync_function.side_effect = (
+            snapshotter.NoSpaceLeftOnDeviceError)
+
+        nose.tools.assert_raises(
+            snapshotter.NoMoreSnapshotsToRemoveError,
+            snapshotter.snapshot, "source", "destination")
+
+    def test_other_rsync_error(self):
+        snapshots = [
+            "2015-03-05T16_23_12.snapshot",
+            "2015-03-05T16_24_15.snapshot",
+            "2015-03-05T16_25_09.snapshot",
+            "2015-03-05T16_27_09.snapshot",
+            "2015-03-05T16_28_09.snapshot",
+        ]
+        self.mock_ls_snapshots_function.return_value = snapshots
+
+        self.mock_rsync_function.side_effect = snapshotter.CalledProcessError(
+            "rsync ...", "error", 23)
+
+        def rm(*args, **kwargs):
+            snapshots.pop(0)
+        self.mock_rm_function.side_effect = rm
+
+        nose.tools.assert_raises(
+            snapshotter.CalledProcessError,
+            snapshotter.snapshot, "source", "destination")

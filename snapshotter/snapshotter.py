@@ -300,7 +300,8 @@ class NoMoreSnapshotsToRemoveError(Exception):
     pass
 
 
-def _remove_oldest_snapshot(dest, user=None, host=None, min_snapshots=3):
+def _remove_oldest_snapshot(dest, user=None, host=None, min_snapshots=3,
+                            debug=False):
     """Remove the oldest snapshot directory from dest.
 
     Raises NoMoreSnapshotsToRemoveError is the number of snapshots in dest is
@@ -308,7 +309,7 @@ def _remove_oldest_snapshot(dest, user=None, host=None, min_snapshots=3):
 
     """
     snapshots = _ls_snapshots(dest)
-    if len(snapshots <= min_snapshots):
+    if len(snapshots) <= min_snapshots:
         raise NoMoreSnapshotsToRemoveError
     else:
         oldest_snapshot = snapshots[0]
@@ -367,7 +368,8 @@ def snapshot(source, dest, debug=False, exclude=None, min_snapshots=3):
             break
         except NoSpaceLeftOnDeviceError:
             _remove_oldest_snapshot(
-                snapshots_root, user, host, min_snapshots=min_snapshots)
+                snapshots_root, user, host, min_snapshots=min_snapshots,
+                debug=debug)
     _move_incomplete_dir(snapshots_root, date, user, host, debug)
     _update_latest_symlink(date, snapshots_root, user, host, debug)
 
