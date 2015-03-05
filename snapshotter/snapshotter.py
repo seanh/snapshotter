@@ -1,7 +1,6 @@
 #!/usr/bin/env python
-"""
+"""A script for making incremental snapshot backups of directories using rsync.
 
-A script for making incremental snapshot backups of directories using rsync.
 See README.markdown for instructions.
 
 """
@@ -69,7 +68,7 @@ def _run(command, debug=False):
 
 class NoSpaceLeftOnDeviceError(Exception):
 
-    """Exception that's raised if rsync fails with "No space left on device"""
+    """Exception that's raised if rsync fails with "No space left on device."""
 
     pass
 
@@ -106,7 +105,7 @@ def _rsync(source, dest, debug=False, extra_args=None):
         '--quiet',  # Suppress non-error output messages.
         '--compress',  # Compress files during transfer.
         '--fuzzy',  # Look for basis files for any missing destination files.
-        ]
+    ]
 
     rsync_cmd.extend(extra_args)
 
@@ -299,6 +298,7 @@ class NoMoreSnapshotsToRemoveError(Exception):
     can't delete any to make space.
 
     """
+
     pass
 
 

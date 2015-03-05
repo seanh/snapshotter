@@ -1,0 +1,6 @@
+strictness: veryhigh
+test-warnings: true
+doc-warnings: true
+member-warnings: true
+pep8:
+  full: true
