@@ -304,7 +304,7 @@ def _remove_oldest_snapshot(dest, user=None, host=None, min_snapshots=3,
                             debug=False):
     """Remove the oldest snapshot directory from dest.
 
-    Raises NoMoreSnapshotsToRemoveError is the number of snapshots in dest is
+    Raises NoMoreSnapshotsToRemoveError if the number of snapshots in dest is
     less than or equal to min_snapshots.
 
     """
