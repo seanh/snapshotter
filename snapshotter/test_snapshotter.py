@@ -114,7 +114,7 @@ class TestCLI(object):
             args=["/home/fred"])
 
     def test_with_default_options(self):
-        src, dest, debug, exclude, min_snapshots = (
+        src, dest, debug, exclude, min_snapshots, extra_args = (
             snapshotter._parse_cli(args=["/home/fred", "/media/backup"]))
         assert src == "/home/fred"
         assert dest == "/media/backup"
@@ -123,9 +123,15 @@ class TestCLI(object):
 
     def test_dry_run(self):
         for option in ("-n", "--dry-run"):
-            _, _, debug, _, _ = snapshotter._parse_cli(
+            _, _, debug, _, _, _ = snapshotter._parse_cli(
                 args=[option, "/home/fred", "/media/backup"])
             assert debug is True
+
+    def test_extra_args(self):
+        _, _, _, _, _, extra_args = (
+            snapshotter._parse_cli(
+                args=["--foo=fred", "-x", "/home/fred", "/media/backup"]))
+        assert extra_args == ["--foo=fred", "-x"]
 
 
 class TestFunctional(object):
@@ -408,6 +414,13 @@ class TestSnapshot(object):
         except snapshotter.CalledProcessError as err:
             assert err.message == "output 25"
 
+    def test_extra_args_are_passed_on_to_rsync(self):
+        extra_args = ["-v", "--info=progress2"]
+
+        snapshotter.snapshot("src", "dest", extra_args=extra_args)
+
+        for arg in extra_args:
+            assert arg in self.mock_run_function.call_args_list[0][0][0]
 
 class TestRemovingOldSnapshots(object):
 

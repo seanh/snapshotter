@@ -9,7 +9,7 @@ import datetime
 import sys
 import os
 import subprocess
-import optparse
+import argparse
 import re
 
 
@@ -66,7 +66,7 @@ class NoSpaceLeftOnDeviceError(Exception):
     pass
 
 
-def _rsync(source, dest, debug=False, exclude=None):
+def _rsync(source, dest, debug=False, exclude=None, extra_args=None):
     """Run an rsync command as a subprocess.
 
     :raises CalledProcessError: if rsync exits with a non-zero exit value
@@ -74,6 +74,9 @@ def _rsync(source, dest, debug=False, exclude=None):
         location
 
     """
+    if not extra_args:
+        extra_args = []
+
     # Make sure source ends with / because this affects how rsync behaves.
     if not source.endswith(os.sep):
         source += os.sep
@@ -96,6 +99,8 @@ def _rsync(source, dest, debug=False, exclude=None):
         '--compress',  # Compress files during transfer.
         '--fuzzy',  # Look for basis files for any missing destination files.
         ]
+
+    rsync_cmd.extend(extra_args)
 
     if os.path.isfile(os.path.expanduser("~/.snapshotter/excludes")):
         # Read exclude patterns from file.
@@ -318,7 +323,8 @@ def _remove_oldest_snapshot(dest, user=None, host=None, min_snapshots=3,
             _rm(oldest_snapshot, user, host, directory=True)
 
 
-def snapshot(source, dest, debug=False, exclude=None, min_snapshots=3):
+def snapshot(source, dest, debug=False, exclude=None, min_snapshots=3,
+             extra_args=None):
     """Make a new snapshot of source in dest.
 
     Make a new snapshot means:
@@ -364,7 +370,7 @@ def snapshot(source, dest, debug=False, exclude=None, min_snapshots=3):
     user, host, snapshots_root = _parse_path(dest)
     while True:
         try:
-            _rsync(source, dest, debug, exclude)
+            _rsync(source, dest, debug, exclude, extra_args)
             break
         except NoSpaceLeftOnDeviceError:
             _remove_oldest_snapshot(
@@ -385,30 +391,31 @@ def _parse_cli(args=None):
     """Parse the command-line arguments."""
     args = args if args is not None else sys.argv[1:]
 
-    parser = optparse.OptionParser(usage="usage: %prog [options] SRC DEST")
-    parser.add_option(
+    parser = argparse.ArgumentParser()
+    parser.add_argument("SRC", help="the path to be backed up")
+    parser.add_argument("DEST", help="the directory to create snapshots in")
+    parser.add_argument(
         '-d', '--debug', '-n', '--dry-run', dest='debug', action='store_true',
         default=False,
         help="Perform a trial-run with no changes made (pass the --dry-run "
              "option to rsync)")
-    parser.add_option(
-        '--exclude', type='string', dest='exclude', metavar="PATTERN",
-        action='append',
+    parser.add_argument(
+        '--exclude', dest='exclude', metavar="PATTERN", action='append',
         help="Exclude files matching PATTERN, e.g. --exclude '.git/*' (see "
              "the --exclude option in `man rsync`)")
-    parser.add_option(
-        '--min-snapshots', type='int', dest='min_snapshots',
+    parser.add_argument(
+        '--min-snapshots', type=int, dest='min_snapshots',
         help="The minimum number of snapshots to leave behind when rolling "
              "out old snapshots to make space for new ones (default: 3)",
         default=3)
-    (options, args) = parser.parse_args(args)
 
-    if len(args) != 2:
-        raise CommandLineArgumentsError(parser.get_usage())
+    try:
+        args, extra_args = parser.parse_known_args(args)
+    except SystemExit as err:
+        raise CommandLineArgumentsError(err.code)
 
-    src = args[0]
-    dest = args[1]
-    return (src, dest, options.debug, options.exclude, options.min_snapshots)
+    return (args.SRC, args.DEST, args.debug, args.exclude, args.min_snapshots,
+            extra_args)
 
 
 def main():
@@ -419,11 +426,11 @@ def main():
 
     """
     try:
-        src, dest, debug, exclude, min_snapshots = _parse_cli()
+        args = _parse_cli()
     except CommandLineArgumentsError as err:
         sys.exit(err.message)
     try:
-        snapshot(src, dest, debug, exclude, min_snapshots)
+        snapshot(*args)
     except (CalledProcessError, NoSuchCommandError) as err:
         sys.exit(err.message)
 
