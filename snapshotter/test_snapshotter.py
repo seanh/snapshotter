@@ -75,7 +75,7 @@ class TestIsRemote(object):
 
 class TestParseRsyncArg(object):
 
-    """Unit tests for the parse_rsync_arg() function."""
+    """Unit tests for the _parse_path() function."""
 
     pass
 
