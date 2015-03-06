@@ -121,7 +121,7 @@ class TestCLI(object):
             args=["/home/fred"])
 
     def test_with_default_options(self):
-        src, dest, debug, _, extra_args = (
+        src, dest, debug, _, _ = (
             snapshotter._parse_cli(args=["/home/fred", "/media/backup"]))
         assert src == "/home/fred"
         assert dest == "/media/backup"
@@ -453,7 +453,6 @@ class TestRemovingOldSnapshots(object):
 
     def test_removing_oldest_snapshot(self):
         """If out of space it should remove oldest snapshot and rerun rsync."""
-
         snapshots = [
             "2015-03-05T16_23_12.snapshot",
             "2015-03-05T16_24_15.snapshot",
