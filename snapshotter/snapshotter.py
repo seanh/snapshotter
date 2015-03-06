@@ -417,12 +417,9 @@ def main():
     """
     logging.basicConfig(level=logging.INFO)
     try:
-        args = _parse_cli()
-    except CommandLineArgumentsError as err:
-        sys.exit(err.message)
-    try:
-        snapshot(*args)
-    except (CalledProcessError, NoSuchCommandError) as err:
+        snapshot(*_parse_cli())
+    except (CommandLineArgumentsError, CalledProcessError,
+            NoSuchCommandError) as err:
         sys.exit(err.message)
 
 
