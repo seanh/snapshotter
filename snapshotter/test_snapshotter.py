@@ -36,6 +36,13 @@ class TestRun(object):
         nose.tools.assert_raises(
             snapshotter.NoSuchCommandError, snapshotter._run, "bar")
 
+    @mock.patch("subprocess.check_output")
+    def test_debug(self, mock_check_output_function):
+        """_run() should not call check_output() if debug is True."""
+        snapshotter._run("command", debug=True)
+
+        assert not mock_check_output_function.called
+
 
 class TestRsync(object):
 
