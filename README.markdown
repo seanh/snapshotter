@@ -115,7 +115,7 @@ To change this number use the `--min-snapshots` argument:
 You can pass any rsync options to snapshotter and it will pass them on to
 rsync. For example:
 
-    snapshotter --exclude '*~' SRC DEST
+    snapshotter --exclude='*~' SRC DEST
 
 See `man rsync` for all the available options.
 
