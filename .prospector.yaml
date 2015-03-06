@@ -1,6 +1,13 @@
 strictness: veryhigh
 test-warnings: true
 doc-warnings: true
-member-warnings: true
 pep8:
   full: true
+pylint:
+  disable:
+    - missing-docstring
+    - protected-access
+pep257:
+  disable:
+    - D102
+    - D100
