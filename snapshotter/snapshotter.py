@@ -421,7 +421,3 @@ def main():
     except (CommandLineArgumentsError, CalledProcessError,
             NoSuchCommandError) as err:
         sys.exit(err.message)
-
-
-if __name__ == "__main__":
-    main()
