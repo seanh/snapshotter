@@ -5,164 +5,124 @@
 Snapshotter
 ===========
 
-A script for making incremental snapshot backups of directories using rsync,
-inspired by Michael Jakl's "Time Machine for every Unix out there":
+Snapshotter provides a simple, configuration-free `snapshotter SRC DEST`
+command that makes incremental, snapshot backups of directories. It uses rsync
+to do the actual copying and has high test coverage.
 
-<http://blog.interlinked.org/tutorials/rsync_time_machine.html>  
-<http://blog.interlinked.org/tutorials/rsync_addendum.yaml.html>
 
-I wanted a simple-as-possible `snapshotter SRC DEST` command that I could use
-to backup any local or remote SRC directory to any local or remote DEST
-directory, either from the command-line or from cron, that would make
-simple snapshot incremental backups and not require any configuration,
-or any command-line options or tricky arguments to remember. It needs to
-be as simple as possible so that I can use it without thinking,
-otherwise it won't get used.
+Installation
+------------
 
-Michael Jakl's shell script was just a little too simple to be useful. I
-needed the script to accept SRC and DEST as command-line arguments, and
-to automagically figure out whether SRC and DEST are local or remote and
-behave accordingly. My Bourne shell scripting ability was not up to the
-task, so I wrote it in Python instead.
+    sudo pip install snapshotter
 
-Snapshotter is just a simple wrapper script for the rsync command, so it's very
-reliable and works almost anywhere.
 
 Usage
 -----
 
-	snapshotter [options] SRC DEST
+To backup a local source directory to a local target directory:
 
-Makes a snapshot backup of SRC inside DEST. Running the same snapshotter command
-repeatedly creates incremental, snapshot backups of SRC inside DEST:
+    snapshotter /path/to/source/dir/to/backup /path/to/backup/destination
 
-	DEST/
-		latest.snapshot/
-		2011-04-03T23_55_37.snapshot/
-		2011-03-03T23_36_50.snapshot/
-		2011-02-03T23_35_13.snapshot/
-		.
-		.
-		.
+To backup a remote directory to a local directory:
+
+    snapshotter you@yourdomain.org:/path/to/source /path/to/backup/destination
+
+To backup a local directory to a remote directory:
+
+    snapshotter /path/to/source you@yourdomain.org:/path/to/snapshots
+
+See `man rsync` for complete documentation of the syntax for specifying local
+and remote paths.
+
+You don't need to worry about whether local or remote source or destination
+paths have a trailing `/` or not - Snapshotter will do the right thing.
+
+Each time you want to make another backup just run the same snapshotter command
+again. Snapshotter will create snapshots like this in the destination
+directory:
+
+    /path/to/backup/destination/
+        latest.snapshot/
+        2011-04-03T23_55_37.snapshot/
+        2011-03-03T23_36_50.snapshot/
+        2011-02-03T23_35_13.snapshot/
 
 `latest.snapshot` is a symlink to the most recent snapshot directory, in this
 case `2011-04-03T23_55_37.snapshot`.
 
-Each snapshot directory contains a complete copy of the SRC directory (but
-hardlinks are used between snapshots to save bandwidth and storage space).
-However the backup _does not cross filesystem boundaries_ within SRC, for each
-mount-point encountered in SRC there will be just an empty directory in DEST.
-If symlinks are encountered in SRC, the symlinks themselves are copied to the
-snapshot, not the files or directories that the symlinks refer to.
+Each snapshot directory contains a complete copy of the source directory, but
+any files that had not changed since the previous snapshot are *hard linked* to
+their corresponding files in the previous snapshot. This means that:
+
+* The amount of new disk space used by each new snapshot is only equal to the
+  size of the files that have changed or are new since the last snapshot.
+
+* The amount of data transferred to make each new snapshot is only equal to the
+  size of the files that have changed or are new since the last snapshot,
+  compressed.
+
+* Old snapshots can be deleted without harming new snapshots at all -
+  each snapshot is an independent complete copy.
+
+Backups don't cross filesystem boundaries. For each mount-point encountered in
+the source directory there'll be just an empty directory in the snapshot.
+This means you can backup your entire filesystem to an external drive with a
+command like `sudo snapshotter / /media/SNAPSHOTS` and it won't try to
+recursively backup `/media/SNAPSHOTS` into `/media/SNAPSHOTS`.
+
+If symlinks are encountered in the source directory the symlinks themselves are
+copied to the snapshot, not the files or directories that the symlinks refer
+to.
+
+
+### Recovering Files from Snapshots
 
 To restore selected files just copy them back from a snapshot directory to the
 live system. To restore an entire snapshot just copy the entire snapshot
 directory back to the live system.
 
-Old snapshots (or selected files within old snapshots) can be deleted without
-affecting newer snapshots.
 
-Either SRC or DEST (but not both) can be a remote directory, e.g.:
-`you@yourdomain.org:/path/to/snapshots`.
+### Resuming Backups
 
-If a snapshotter command is interrupted the transferred files will be stored in an
-`incomplete.snapshot` directory in DEST, and the backup can be resumed by
-running the same command again.
+If a `snapshotter` command is interrupted for any reason (e.g. you `Ctrl-c` it)
+just run the same command again to resume making the snapshot where you left
+off.
 
-To exclude files from being backed up list them in a file at
-`$HOME/.backup/excludes` on the machine that is running the snapshotter command, one
-rsync exclude pattern per line.
+Snapshots are written to an `incomplete.snapshot` directory in the destination
+directory first and then moved to a `YYYY-MM-DDTHH_MM_SS.snapshot` directory
+when complete. If a snapshot is interrupted the `incomplete.snapshot` directory
+will be left behind and used to resume the snapshot if you run it again.
 
-Advantages
-----------
-
-+	**Super simple backup.**
-	Just type: `snapshotter SRC DEST`.
-
-+	**Super simple restore.**
-	Just copy files back from snapshot directories.
-
-+	**Local and remote**
-	SRC and DEST are supported. You can backup a remote directory to a local
-	one, backup a local directory to a remote one, or backup a local directory
-	to another local directory (but you cannot backup a remote directory to
-	another remote directory).
-
-+	**Resumes interrupted backups.**
-    Just run the same snapshotter command again.
-
-+	**You can specify exclude patterns** for files to be excluded from the
-	snapshots.
-
-+	**Efficient with bandwidth.**
-	Only the differences between files are transferred, and these are
-	compressed.
-
-+	**Somewhat efficient with storage space.**
-
-	Uses rsync's `--link-dest` option so that in each new snapshot, files that
-	have not changed since the previous snapshot will be hardlinks to their
-	counterparts in the previous snapshot.  This means that although each
-	snapshot directory contains a complete copy of the SRC directory, and older
-	snapshots can always be deleted without harming newer snapshots, the amount
-	of additional storage space taken by each new snapshot is only equal to the
-	size of the files that changed since the previous snapshot.
-
-	However, when a file has changed a complete new copy of that file (not a
-	diff) will be stored in the new snapshot. If a file has been moved or
-	renamed rsync _may_ be able to find a basis for the file in the previous
-	snapshot, or it may backup a complete new copy of the file. If you restore
-	a file from a snapshot older than the latest snapshot and then do another
-	backup, a complete new copy of the file will be stored in the new snapshot.
-
-Disadvantages
--------------
-
--	Does not compress snapshots.
-	You could use a compression tool to compress old snapshots afterwards, but the
-	latest snapshot has to be left uncompressed so that it can be compared to
-	the current SRC directory when making the next snapshot.
--	Does not encrypt snapshots.
-	You could use an encrypted filesystem for DEST and get encryption that way.
--	Does not do deduplication.
-
-Example Commands
-----------------
-
-Backup a local directory to a local directory:
-
-	snapshotter Mail Mail.snapshots
-
-Backup a local directory to a local external drive:
-
-	snapshotter Music /media/BACKUP/Music.snapshots
-
-Backup your entire home directory to an external drive:
-
-	snapshotter ~ /media/SNAPSHOTS
-
-Backup your entire system to an external drive:
-
-	sudo snapshotter / /media/SNAPSHOTS
-
-(Because the backup does not cross filesystem boundaries, this will not attempt
-to recursively backup /media/SNAPSHOTS into /media/SNAPSHOTS, but note that any
-other mounted filesystems will not be backed up either.)
-
-Backup a local directory to a remote directory:
-
-	snapshotter Documents seanh@mydomain.org:Snapshots/Documents
-
-Backup a remote directory to a local directory:
-
-	snapshotter seanh@mydomain.org:Documents Snapshots/Documents
-
-Make a local backup of your SDF homedir:
-
-	snapshotter you@sdf.lonestar.org Snapshots/sdf.lonestar.org
 
 Options
 -------
 
-`-d` or `--debug` or `-n` or `--dry-run`  
-Perform a trial-run with no changes made, passes the `--dry-run` option to rsync.
+To do a dry-run (just print out what would be done, but don't actually copy any
+files) do:
+
+    snapshotter --dry-run SRC DEST
+
+Snapshotter automatically deletes your oldest snapshots when necessary to make
+space for a new snapshot. By default it will always keep at least 3 snapshots.
+To change this number use the `--min-snapshots` argument:
+
+    snapshotter --min-snapshots 10 SRC DEST
+
+You can pass any rsync options to snapshotter and it will pass them on to
+rsync. For example:
+
+    snapshotter --exclude '*~' SRC DEST
+
+See `man rsync` for all the available options.
+
+For complete documentation of Snapshotter's command-line interface run:
+
+    snapshotter -h
+
+* * *
+
+Snapshotter is inspired by Michael Jakl's
+"Time Machine for every Unix out there":
+
+<http://blog.interlinked.org/tutorials/rsync_time_machine.html>  
+<http://blog.interlinked.org/tutorials/rsync_addendum.yaml.html>
