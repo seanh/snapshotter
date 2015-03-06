@@ -1,6 +1,10 @@
 [![Build Status](https://travis-ci.org/seanh/snapshotter.svg)](https://travis-ci.org/seanh/snapshotter)
 [![Coverage Status](https://img.shields.io/coveralls/seanh/snapshotter.svg)](https://coveralls.io/r/seanh/snapshotter)
-
+[![Latest Version](https://pypip.in/version/snapshotter/badge.svg)](https://pypi.python.org/pypi/snapshotter/)
+[![Downloads](https://pypip.in/download/snapshotter/badge.svg)](https://pypi.python.org/pypi/snapshotter/)
+[![Supported Python versions](https://pypip.in/py_versions/snapshotter/badge.svg)](https://pypi.python.org/pypi/snapshotter/)
+[![Development Status](https://pypip.in/status/snapshotter/badge.svg)](https://pypi.python.org/pypi/snapshotter/)
+[![License](https://pypip.in/license/snapshotter/badge.svg)](https://pypi.python.org/pypi/snapshotter/)
 
 Snapshotter
 ===========
