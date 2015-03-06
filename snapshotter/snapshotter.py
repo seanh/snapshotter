@@ -81,9 +81,6 @@ def _rsync(source, dest, debug=False, extra_args=None):
         location
 
     """
-    if not extra_args:
-        extra_args = []
-
     # Make sure source ends with / because this affects how rsync behaves.
     if not source.endswith(os.sep):
         source += os.sep
@@ -107,7 +104,7 @@ def _rsync(source, dest, debug=False, extra_args=None):
         '--fuzzy',  # Look for basis files for any missing destination files.
     ]
 
-    rsync_cmd.extend(extra_args)
+    rsync_cmd.extend(extra_args or [])
 
     if debug:
         rsync_cmd.append('--dry-run')
