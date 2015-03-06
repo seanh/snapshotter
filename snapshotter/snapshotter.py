@@ -117,7 +117,7 @@ def _rsync(source, dest, debug=False, extra_args=None):
         if user is not None:
             dest += "%s@" % user
         dest += "%s:" % host
-    dest += "%s/incomplete.snapshot" % snapshots_root
+    dest += os.path.join(snapshots_root, "incomplete.snapshot")
     rsync_cmd.append(dest)
 
     _info("Running rsync")
@@ -160,8 +160,8 @@ def _move_incomplete_dir(snapshots_root, date, user=None, host=None,
     by running `ssh [user@]host mv ...`.
 
     """
-    src = "%s/incomplete.snapshot" % snapshots_root
-    dest = "%s/%s.snapshot" % (snapshots_root, date)
+    src = os.path.join(snapshots_root, "incomplete.snapshot")
+    dest = os.path.join(snapshots_root, date + ".snapshot")
     mv_cmd = _wrap_in_ssh(["mv", src, dest], user, host)
     _info("Moving incomplete.snapshot")
     _run(mv_cmd, debug=debug)
@@ -194,15 +194,16 @@ def _ln(target, link_path, user=None, host=None, debug=False):
 
 def _update_latest_symlink(date, snapshots_root, user=None, host=None,
                            debug=False):
-    """Update the latest.snapshot symlink to point to the new  snapshot.
+    """Update the latest.snapshot symlink to point to the new snapshot.
 
     If snapshots_root is a remote directory then update the symlink remotely.
 
     """
     target = "%s.snapshot" % date
-    link_name = "%s/latest.snapshot" % snapshots_root
+    link_name = os.path.join(snapshots_root, "latest.snapshot")
     _info("Updating latest.snapshot symlink")
-    _rm("%s/latest.snapshot" % snapshots_root, user, host, debug=debug)
+    _rm(os.path.join(snapshots_root, "latest.snapshot"), user, host,
+        debug=debug)
     _ln(target, link_name, user, host, debug=debug)
 
 
@@ -224,7 +225,7 @@ def _is_remote(path):
 
     """
     # If it has a : before the first / then it's a remote path.
-    return ':' in path.split('/')[0]
+    return ':' in path.split(os.sep)[0]
 
 
 def _parse_path(path):
