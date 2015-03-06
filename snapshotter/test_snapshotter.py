@@ -26,7 +26,7 @@ class TestRun(object):
         command = "rsync --foobar"
         try:
             snapshotter._run(command.split())
-            assert False
+            assert False, "We shouldn't get here"
         except snapshotter.CalledProcessError as err:
             assert err.command == command
             assert err.output.startswith("rsync: --foobar: unknown option")
