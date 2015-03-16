@@ -68,6 +68,9 @@ their corresponding files in the previous snapshot. This means that:
 * Old snapshots can be deleted without harming new snapshots at all -
   each snapshot is an independent complete copy.
 
+  (But _don't modify files in snapshots_, not even their metadata such as permissions,
+  as this will also modify the file in any other snapshots that have hardlinks to it.)
+  
 Backups don't cross filesystem boundaries. For each mount-point encountered in
 the source directory there'll be just an empty directory in the snapshot.
 This means you can backup your entire filesystem to an external drive with a
