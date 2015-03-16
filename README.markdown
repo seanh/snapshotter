@@ -101,6 +101,20 @@ when complete. If a snapshot is interrupted the `incomplete.snapshot` directory
 will be left behind and used to resume the snapshot if you run it again.
 
 
+### Suspend After Backup
+
+You can put your computer to sleep automatically after a backup finishes simply
+by chaining two commands in a shell:
+
+    snapshotter [OPTIONS] <SRC> <DST>; suspend
+    
+Where `suspend` is a script on your `PATH` that suspends your computer without
+requiring sudo powers. On Ubuntu 14.04 this works for me:
+
+    #!/bin/sh -e
+    dbus-send --system --print-reply --dest="org.freedesktop.UPower" /org/freedesktop/UPower org.freedesktop.UPower.Suspend
+
+
 Options
 -------
 
