@@ -68,6 +68,9 @@ their corresponding files in the previous snapshot. This means that:
 * Old snapshots can be deleted without harming new snapshots at all -
   each snapshot is an independent complete copy.
 
+  (But _don't modify files in snapshots_, not even their metadata such as permissions,
+  as this will also modify the file in any other snapshots that have hardlinks to it.)
+  
 Backups don't cross filesystem boundaries. For each mount-point encountered in
 the source directory there'll be just an empty directory in the snapshot.
 This means you can backup your entire filesystem to an external drive with a
@@ -96,6 +99,20 @@ Snapshots are written to an `incomplete.snapshot` directory in the destination
 directory first and then moved to a `YYYY-MM-DDTHH_MM_SS.snapshot` directory
 when complete. If a snapshot is interrupted the `incomplete.snapshot` directory
 will be left behind and used to resume the snapshot if you run it again.
+
+
+### Suspend After Backup
+
+You can put your computer to sleep automatically after a backup finishes simply
+by chaining two commands in a shell:
+
+    snapshotter [OPTIONS] <SRC> <DST>; suspend
+    
+Where `suspend` is a script on your `PATH` that suspends your computer without
+requiring sudo powers. On Ubuntu 14.04 this works for me:
+
+    #!/bin/sh -e
+    dbus-send --system --print-reply --dest="org.freedesktop.UPower" /org/freedesktop/UPower org.freedesktop.UPower.Suspend
 
 
 Options
