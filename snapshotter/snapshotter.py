@@ -165,6 +165,7 @@ def _move_incomplete_dir(snapshots_root, date, user=None, host=None,
     mv_cmd = _wrap_in_ssh(["mv", src, dest], user, host)
     _info("Moving incomplete.snapshot")
     _run(mv_cmd, debug=debug)
+    return dest
 
 
 def _rm(path, user=None, host=None, directory=False, debug=False):
@@ -369,8 +370,9 @@ def snapshot(source, dest, debug=False, min_snapshots=3, extra_args=None):
             _remove_oldest_snapshot(
                 snapshots_root, user, host, min_snapshots=min_snapshots,
                 debug=debug)
-    _move_incomplete_dir(snapshots_root, date, user, host, debug)
+    snapshot = _move_incomplete_dir(snapshots_root, date, user, host, debug)
     _update_latest_symlink(date, snapshots_root, user, host, debug)
+    _info("Successfully completed snapshot: {path}".format(path=snapshot))
 
 
 class CommandLineArgumentsError(Exception):
