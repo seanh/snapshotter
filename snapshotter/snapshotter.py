@@ -120,7 +120,6 @@ def _rsync(source, dest, debug=False, extra_args=None):
     dest += os.path.join(snapshots_root, "incomplete.snapshot")
     rsync_cmd.append(dest)
 
-    _info("Running rsync")
     try:
         _run(rsync_cmd)
     except CalledProcessError as err:
