@@ -365,7 +365,8 @@ def snapshot(source, dest, debug=False, min_snapshots=3, extra_args=None):
         try:
             _rsync(source, dest, debug, extra_args)
             break
-        except NoSpaceLeftOnDeviceError:
+        except NoSpaceLeftOnDeviceError as err:
+            _info(err)
             _remove_oldest_snapshot(
                 snapshots_root, user, host, min_snapshots=min_snapshots,
                 debug=debug)
