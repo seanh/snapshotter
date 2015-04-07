@@ -1,0 +1,4 @@
+1.0.1
+-----
+- Tweaks to the README
+- Tweaks to the log messages that snapshotter outputs
