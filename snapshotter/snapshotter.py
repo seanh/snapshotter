@@ -4,6 +4,8 @@
 See README.markdown for instructions.
 
 """
+from __future__ import unicode_literals
+
 import datetime
 import sys
 import os
@@ -11,6 +13,12 @@ import subprocess
 import argparse
 import re
 import logging
+
+
+if sys.version_info[0] == 2:
+    PY2, PY3 = True, False
+elif sys.version_info[0] == 3:
+    PY2, PY3 = False, True
 
 
 def _info(message):
@@ -22,8 +30,11 @@ class CalledProcessError(Exception):
     """Exception type that's raised if an external command fails."""
 
     def __init__(self, command, output, exit_value):
-        super(CalledProcessError, self).__init__(
-            output + " " + str(exit_value))
+        if PY2:
+            output = unicode(output) + " " + unicode(exit_value)  # noqa
+        elif PY3:
+            output = str(output) + " " + str(exit_value)
+        super(CalledProcessError, self).__init__(output)
         self.command = command
         self.output = output
         self.exit_value = exit_value
@@ -124,7 +135,7 @@ def _rsync(source, dest, debug=False, extra_args=None):
         _run(rsync_cmd)
     except CalledProcessError as err:
         if err.exit_value == 11 and "No space left on device" in err.output:
-            raise NoSpaceLeftOnDeviceError(err.message)
+            raise NoSpaceLeftOnDeviceError(err.output)
         else:
             raise
 

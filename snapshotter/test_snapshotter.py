@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 import os
 import tempfile
 import sys
@@ -6,7 +8,10 @@ import shutil
 import mock
 import nose.tools
 
-import snapshotter
+from . import snapshotter
+
+
+PY2, PY3 = snapshotter.PY2, snapshotter.PY3
 
 
 def _this_directory():
@@ -29,7 +34,11 @@ class TestRun(object):
             assert False, "We shouldn't get here"
         except snapshotter.CalledProcessError as err:
             assert err.command == command
-            assert err.output.startswith("rsync: --foobar: unknown option")
+            # FIXME remove debug statements when fixed
+            print("type(err.output): %s" % type(err.output))
+            print("err.output: %s" % err.output)
+            #err.output = err.output.encode()
+            assert err.output.encode().startswith("rsync: --foobar: unknown option")
             assert err.exit_value == 1
 
     def test_command_does_not_exist(self):
@@ -251,7 +260,7 @@ class TestSnapshot(object):
             snapshotter.snapshot(src, dst, debug=True)
             assert False, "snapshot() should have raised an exception"
         except snapshotter.CalledProcessError as err:
-            assert err.message == "output 11"
+            assert err.output == "output 11"
 
     def test_link_dest(self):
         """The right --link-dest=... arg should be given to rsync."""
@@ -415,7 +424,7 @@ class TestSnapshot(object):
             snapshotter.snapshot(src, dst)
             assert False, "snapshot() should have raised an exception"
         except snapshotter.CalledProcessError as err:
-            assert err.message == "output 25"
+            assert err.output == "output 25"
 
     def test_extra_args_are_passed_on_to_rsync(self):
         extra_args = ["-v", "--info=progress2"]
@@ -464,6 +473,7 @@ class TestRemovingOldSnapshots(object):
         self.mock_ls_snapshots_function.return_value = snapshots
 
         rsync_returns = [snapshotter.NoSpaceLeftOnDeviceError(), None]
+
         def rsync(*args, **kwargs):
             result = rsync_returns.pop(0)
             if isinstance(result, Exception):
@@ -498,6 +508,7 @@ class TestRemovingOldSnapshots(object):
             snapshotter.NoSpaceLeftOnDeviceError(),
             snapshotter.NoSpaceLeftOnDeviceError(),
             None]
+
         def rsync(*args, **kwargs):
             result = rsync_returns.pop(0)
             if isinstance(result, Exception):
