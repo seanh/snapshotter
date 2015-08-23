@@ -427,8 +427,14 @@ def _parse_cli(args=None):
     except SystemExit as err:
         raise CommandLineArgumentsError(err.code)
 
-    return (args.SRC, args.DEST, args.debug, args.min_snapshots,
-            extra_args)
+    try:
+        src = text(args.SRC, encoding=STDOUT_ENCODING)
+        dest = text(args.DEST, encoding=STDOUT_ENCODING)
+    except TypeError:
+        src = args.SRC
+        dest = args.DEST
+
+    return (src, dest, args.debug, args.min_snapshots, extra_args)
 
 
 def main():
