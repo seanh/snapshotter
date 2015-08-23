@@ -1,3 +1,7 @@
+from __future__ import unicode_literals
+from __future__ import absolute_import
+from __future__ import print_function
+
 import os
 import tempfile
 import sys
@@ -6,7 +10,7 @@ import shutil
 import mock
 import nose.tools
 
-import snapshotter
+from . import snapshotter
 
 
 def _this_directory():
@@ -251,7 +255,7 @@ class TestSnapshot(object):
             snapshotter.snapshot(src, dst, debug=True)
             assert False, "snapshot() should have raised an exception"
         except snapshotter.CalledProcessError as err:
-            assert err.message == "output 11"
+            assert err.output == "output"
 
     def test_link_dest(self):
         """The right --link-dest=... arg should be given to rsync."""
@@ -415,7 +419,7 @@ class TestSnapshot(object):
             snapshotter.snapshot(src, dst)
             assert False, "snapshot() should have raised an exception"
         except snapshotter.CalledProcessError as err:
-            assert err.message == "output 25"
+            assert err.output == "output"
 
     def test_extra_args_are_passed_on_to_rsync(self):
         extra_args = ["-v", "--info=progress2"]

@@ -4,6 +4,10 @@
 See README.markdown for instructions.
 
 """
+from __future__ import unicode_literals
+from __future__ import absolute_import
+from __future__ import print_function
+
 import datetime
 import sys
 import os
@@ -12,8 +16,27 @@ import argparse
 import re
 import logging
 
+from snapshotter import PY2, PY3
+
+
+try:
+    STDOUT_ENCODING = sys.stdout.encoding or sys.getdefaultencoding()
+except AttributeError:
+    STDOUT_ENCODING = sys.getdefaultencoding()
+
+
+if PY2:
+    text = unicode
+else:
+    text = str
+
 
 def _info(message):
+    """
+
+    :type message: unicode string
+
+    """
     logging.getLogger("snapshotter").info(message)
 
 
@@ -22,8 +45,15 @@ class CalledProcessError(Exception):
     """Exception type that's raised if an external command fails."""
 
     def __init__(self, command, output, exit_value):
+        """
+
+        :type command: unicode string
+        :type output: unicode string
+        :type exit_value: int
+
+        """
         super(CalledProcessError, self).__init__(
-            output + " " + str(exit_value))
+            output + " " + text(exit_value))
         self.command = command
         self.output = output
         self.exit_value = exit_value
@@ -34,6 +64,12 @@ class NoSuchCommandError(Exception):
     """Raised when trying to run an external command that doesn't exist."""
 
     def __init__(self, command, message):
+        """
+
+        :type command: unicode string
+        :type message: unicode string
+
+        """
         super(NoSuchCommandError, self).__init__(message)
         self.command = command
 
@@ -43,6 +79,8 @@ def _run(command, debug=False):
 
     This redirects the subprocess's stderr to stdout so the returned string
     should contain everything written to stdout and stderr together.
+
+    :type command: list of unicode strings
 
     :raises CalledProcessError: If running the command fails or the command
         exits with non-zero status. The command's stdout and stderr will be
@@ -55,10 +93,14 @@ def _run(command, debug=False):
     if debug:
         return
     try:
-        return subprocess.check_output(command, stderr=subprocess.STDOUT)
+        return text(
+            subprocess.check_output(command, stderr=subprocess.STDOUT),
+            encoding=STDOUT_ENCODING)
     except subprocess.CalledProcessError as err:
         raise CalledProcessError(
-            ' '.join(command), err.output, err.returncode)
+            ' '.join(command),
+            text(err.output, encoding=STDOUT_ENCODING),
+            err.returncode)
     except OSError as err:
         if err.errno == 2:
             raise NoSuchCommandError(' '.join(command), err.strerror)
@@ -75,6 +117,9 @@ class NoSpaceLeftOnDeviceError(Exception):
 
 def _rsync(source, dest, debug=False, extra_args=None):
     """Run an rsync command as a subprocess.
+
+    :type source: unicode string
+    :type dest: unicode string
 
     :raises CalledProcessError: if rsync exits with a non-zero exit value
     :raises NoSuchCommandError: if rsync is not installed in the expected
@@ -124,13 +169,17 @@ def _rsync(source, dest, debug=False, extra_args=None):
         _run(rsync_cmd)
     except CalledProcessError as err:
         if err.exit_value == 11 and "No space left on device" in err.output:
-            raise NoSpaceLeftOnDeviceError(err.message)
+            raise NoSpaceLeftOnDeviceError(err.output)
         else:
             raise
 
 
 def _wrap_in_ssh(command, user, host):
     """Return the given command with ssh prepended to run it remotely.
+
+    :type command: unicode string
+    :type user: unicode string
+    :type host: unicode string
 
     For example for ["mv", "source", "dest"] return
     ["ssh", "user@host", "mv", "source", "dest"].
@@ -155,6 +204,11 @@ def _move_incomplete_dir(snapshots_root, date, user=None, host=None,
                          debug=False):
     """Move the incomplete.snapshot dir to YYYY-MM-DDTHH_MM_SS.snapshot.
 
+    :type snapshots_root: unicode string
+    :type date: unicode string
+    :type user: unicode string
+    :type host: unicode string
+
     If snapshots_root is a remote path move the directory remotely
     by running `ssh [user@]host mv ...`.
 
@@ -170,6 +224,10 @@ def _move_incomplete_dir(snapshots_root, date, user=None, host=None,
 def _rm(path, user=None, host=None, directory=False, debug=False):
     """Remove the given filesystem path.
 
+    :type path: unicode string
+    :type user: unicode string
+    :type host: unicode string
+
     If path is a remote path remove it remotely by running
     `ssh [user@]host rm ...`.
 
@@ -184,6 +242,11 @@ def _rm(path, user=None, host=None, directory=False, debug=False):
 def _ln(target, link_path, user=None, host=None, debug=False):
     """Create a symlink to the given target of the given link path.
 
+    :type target: unicode string
+    :type link_path: unicode string
+    :type user: unicode string
+    :type host: unicode string
+
     If link_path is a remote path then create the symlink remotely by running
     `ssh [user@]host ln -s ...`.
 
@@ -195,6 +258,11 @@ def _ln(target, link_path, user=None, host=None, debug=False):
 def _update_latest_symlink(date, snapshots_root, user=None, host=None,
                            debug=False):
     """Update the latest.snapshot symlink to point to the new snapshot.
+
+    :type date: unicode string
+    :type snapshots_root: unicode string
+    :type user: unicode string
+    :type host: unicode string
 
     If snapshots_root is a remote directory then update the symlink remotely.
 
@@ -222,6 +290,7 @@ def _is_remote(path):
 
     :param path: a local or remote path as would be used in an rsync SRC or
         DEST argument on the command-line
+    :type path: unicode string
 
     """
     # If it has a : before the first / then it's a remote path.
@@ -231,13 +300,14 @@ def _is_remote(path):
 def _parse_path(path):
     """Parse the given local or remote path and return its parts.
 
-
     :param path: a local or remote path as would be used in an rsync SRC or
         DEST argument on the command-line
+    :type path: unicode string
 
     :returns: A 3-tuple (user, host, path) of the username, hostname and path
         parts of the given path. Both user and host may be None.
         user may be None while host is not None.
+    :rtype: 3-tuple of unicode strings
 
     For example:
 
@@ -276,6 +346,8 @@ def _parse_path(path):
 def _ls_snapshots(dest):
     """Return a sorted list of the snapshot directories in directory dest.
 
+    :type dest: unicode string
+
     Snapshots are sorted oldest-first, going by the date in their
     YYYY-MM-DDTHH_MM_SS.snapshot filename.
 
@@ -304,6 +376,10 @@ def _remove_oldest_snapshot(dest, user=None, host=None, min_snapshots=3,
                             debug=False):
     """Remove the oldest snapshot directory from dest.
 
+    type dest: unicode string
+    type user: unicode string
+    type host: unicode string
+
     Raises NoMoreSnapshotsToRemoveError if the number of snapshots in dest is
     less than or equal to min_snapshots.
 
@@ -319,6 +395,9 @@ def _remove_oldest_snapshot(dest, user=None, host=None, min_snapshots=3,
 
 def snapshot(source, dest, debug=False, min_snapshots=3, extra_args=None):
     """Make a new snapshot of source in dest.
+
+    :type source: unicode string
+    :type dest: unicode string
 
     Make a new snapshot means:
 
@@ -420,4 +499,4 @@ def main():
         snapshot(*_parse_cli())
     except (CommandLineArgumentsError, CalledProcessError,
             NoSuchCommandError) as err:
-        sys.exit(err.message)
+        sys.exit(err.output)
