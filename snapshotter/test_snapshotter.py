@@ -1,4 +1,6 @@
 from __future__ import unicode_literals
+from __future__ import absolute_import
+from __future__ import print_function
 
 import os
 import tempfile
@@ -8,10 +10,7 @@ import shutil
 import mock
 import nose.tools
 
-from . import snapshotter
-
-
-PY2, PY3 = snapshotter.PY2, snapshotter.PY3
+from snapshotter import snapshotter
 
 
 def _this_directory():
@@ -34,11 +33,7 @@ class TestRun(object):
             assert False, "We shouldn't get here"
         except snapshotter.CalledProcessError as err:
             assert err.command == command
-            # FIXME remove debug statements when fixed
-            print("type(err.output): %s" % type(err.output))
-            print("err.output: %s" % err.output)
-            #err.output = err.output.encode()
-            assert err.output.encode().startswith("rsync: --foobar: unknown option")
+            assert err.output.startswith("rsync: --foobar: unknown option")
             assert err.exit_value == 1
 
     def test_command_does_not_exist(self):

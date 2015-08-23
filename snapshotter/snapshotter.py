@@ -5,6 +5,8 @@ See README.markdown for instructions.
 
 """
 from __future__ import unicode_literals
+from __future__ import absolute_import
+from __future__ import print_function
 
 import datetime
 import sys
@@ -15,10 +17,19 @@ import re
 import logging
 
 
-if sys.version_info[0] == 2:
-    PY2, PY3 = True, False
-elif sys.version_info[0] == 3:
-    PY2, PY3 = False, True
+from snapshotter import PY2, PY3
+
+
+try:
+    STDOUT_ENCODING = sys.stdout.encoding or sys.getdefaultencoding()
+except AttributeError:
+    STDOUT_ENCODING = sys.getdefaultencoding()
+
+
+if PY2:
+    text = unicode
+else:
+    text = str
 
 
 def _info(message):
@@ -30,10 +41,7 @@ class CalledProcessError(Exception):
     """Exception type that's raised if an external command fails."""
 
     def __init__(self, command, output, exit_value):
-        if PY2:
-            output = unicode(output) + " " + unicode(exit_value)  # noqa
-        elif PY3:
-            output = str(output) + " " + str(exit_value)
+        output = output + ' ' + text(exit_value)
         super(CalledProcessError, self).__init__(output)
         self.command = command
         self.output = output
@@ -66,10 +74,14 @@ def _run(command, debug=False):
     if debug:
         return
     try:
-        return subprocess.check_output(command, stderr=subprocess.STDOUT)
+        return text(
+            subprocess.check_output(command, stderr=subprocess.STDOUT),
+            encoding=STDOUT_ENCODING)
     except subprocess.CalledProcessError as err:
         raise CalledProcessError(
-            ' '.join(command), err.output, err.returncode)
+            ' '.join(command),
+            text(err.output, encoding=STDOUT_ENCODING),
+            err.returncode)
     except OSError as err:
         if err.errno == 2:
             raise NoSuchCommandError(' '.join(command), err.strerror)
@@ -431,4 +443,4 @@ def main():
         snapshot(*_parse_cli())
     except (CommandLineArgumentsError, CalledProcessError,
             NoSuchCommandError) as err:
-        sys.exit(err.message)
+        sys.exit(err.output)
