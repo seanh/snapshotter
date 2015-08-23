@@ -4,6 +4,10 @@
 See README.markdown for instructions.
 
 """
+from __future__ import unicode_literals
+from __future__ import absolute_import
+from __future__ import print_function
+
 import datetime
 import sys
 import os
@@ -11,6 +15,21 @@ import subprocess
 import argparse
 import re
 import logging
+
+
+from snapshotter import PY2, PY3
+
+
+try:
+    STDOUT_ENCODING = sys.stdout.encoding or sys.getdefaultencoding()
+except AttributeError:
+    STDOUT_ENCODING = sys.getdefaultencoding()
+
+
+if PY2:
+    text = unicode
+else:
+    text = str
 
 
 def _info(message):
@@ -22,8 +41,8 @@ class CalledProcessError(Exception):
     """Exception type that's raised if an external command fails."""
 
     def __init__(self, command, output, exit_value):
-        super(CalledProcessError, self).__init__(
-            output + " " + str(exit_value))
+        output = output + ' ' + text(exit_value)
+        super(CalledProcessError, self).__init__(output)
         self.command = command
         self.output = output
         self.exit_value = exit_value
@@ -55,10 +74,14 @@ def _run(command, debug=False):
     if debug:
         return
     try:
-        return subprocess.check_output(command, stderr=subprocess.STDOUT)
+        return text(
+            subprocess.check_output(command, stderr=subprocess.STDOUT),
+            encoding=STDOUT_ENCODING)
     except subprocess.CalledProcessError as err:
         raise CalledProcessError(
-            ' '.join(command), err.output, err.returncode)
+            ' '.join(command),
+            text(err.output, encoding=STDOUT_ENCODING),
+            err.returncode)
     except OSError as err:
         if err.errno == 2:
             raise NoSuchCommandError(' '.join(command), err.strerror)
@@ -124,7 +147,7 @@ def _rsync(source, dest, debug=False, extra_args=None):
         _run(rsync_cmd)
     except CalledProcessError as err:
         if err.exit_value == 11 and "No space left on device" in err.output:
-            raise NoSpaceLeftOnDeviceError(err.message)
+            raise NoSpaceLeftOnDeviceError(err.output)
         else:
             raise
 
@@ -420,4 +443,4 @@ def main():
         snapshot(*_parse_cli())
     except (CommandLineArgumentsError, CalledProcessError,
             NoSuchCommandError) as err:
-        sys.exit(err.message)
+        sys.exit(err.output)
