@@ -22,7 +22,7 @@ from snapshotter import PY2, PY3, STDOUT_ENCODING
 
 if PY2:
     text = unicode
-else:
+elif PY3:
     text = str
 
 
