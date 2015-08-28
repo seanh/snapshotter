@@ -17,13 +17,7 @@ import re
 import logging
 
 
-from snapshotter import PY2, PY3
-
-
-try:
-    STDOUT_ENCODING = sys.stdout.encoding or sys.getdefaultencoding()
-except AttributeError:
-    STDOUT_ENCODING = sys.getdefaultencoding()
+from snapshotter import PY2, PY3, STDOUT_ENCODING
 
 
 if PY2:
