@@ -22,6 +22,20 @@ Installation
     sudo pip install snapshotter
 
 
+### Upgrading
+
+To upgrade to a newer version of Snapshotter do:
+
+```bash
+sudo pip install --upgrade snapshotter
+```
+
+To see what version of Snapshotter you currently have installed do:
+
+```bash
+pip freeze | grep snapshotter
+```
+
 Usage
 -----
 
