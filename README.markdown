@@ -9,6 +9,13 @@ command that makes incremental, snapshot backups of directories. It uses rsync
 to do the actual copying and has high test coverage.
 
 
+Requirements
+------------
+
+[rsync](https://rsync.samba.org/) and [Python](https://www.python.org/) 2.7,
+3.2, 3.3, 3.4 or 3.5.
+
+
 Installation
 ------------
 
