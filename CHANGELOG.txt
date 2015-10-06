@@ -1,3 +1,8 @@
+1.0.2
+-----
+- Added Python 3 support
+- Fixed error with non-ASCII characters in SRC or DEST
+
 1.0.1
 -----
 - Tweaks to the README
