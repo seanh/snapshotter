@@ -317,6 +317,18 @@ class NoMoreSnapshotsToRemoveError(Exception):
     pass
 
 
+class InconsistentArguments(Exception):
+
+    """Exception that's raised if there's a contradiction between inputs.
+
+    Raised if --min-snapshots (default: 3) and --max-snapshots (default: -1)
+    are not set in a consistent way.
+
+    """
+
+    pass
+
+
 def _remove_oldest_snapshot(dest, user=None, host=None, min_snapshots=3,
                             debug=False):
     """Remove the oldest snapshot directory from dest.
@@ -334,7 +346,7 @@ def _remove_oldest_snapshot(dest, user=None, host=None, min_snapshots=3,
         _rm(oldest_snapshot, user, host, directory=True, debug=debug)
 
 
-def snapshot(source, dest, debug=False, min_snapshots=3, extra_args=None):
+def snapshot(source, dest, debug=False, min_snapshots=3, max_snapshots=-1, extra_args=None):
     """Make a new snapshot of source in dest.
 
     Make a new snapshot means:
@@ -378,6 +390,12 @@ def snapshot(source, dest, debug=False, min_snapshots=3, extra_args=None):
     """
     date = _datetime()
     user, host, snapshots_root = _parse_path(dest)
+    if max_snapshots > -1 and max_snapshots - min_snapshots < 0:
+        raise InconsistentArguments
+    if max_snapshots > -1 and max_snapshots+1 - min_snapshots >= 0:
+        snapshots = _ls_snapshots(dest)
+        for i in range(len(snapshots)-max_snapshots+1):
+            _rm(snapshots[i], user, host, directory=True, debug=debug)
     while True:
         try:
             _rsync(source, dest, debug, extra_args)
@@ -415,6 +433,11 @@ def _parse_cli(args=None):
         help="The minimum number of snapshots to leave behind when rolling "
              "out old snapshots to make space for new ones (default: 3)",
         default=3)
+    parser.add_argument(
+        '--max-snapshots', type=int, dest='max_snapshots',
+        help="The maximum number of snapshots allowed for the backup "
+             " (default: -1)",
+        default=-1)
 
     try:
         args, extra_args = parser.parse_known_args(args)
@@ -428,7 +451,7 @@ def _parse_cli(args=None):
         src = args.SRC
         dest = args.DEST
 
-    return (src, dest, args.debug, args.min_snapshots, extra_args)
+    return (src, dest, args.debug, args.min_snapshots, args.max_snapshots, extra_args)
 
 
 def main():
