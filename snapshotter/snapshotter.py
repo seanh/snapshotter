@@ -24,7 +24,7 @@ if PY2:
     text = unicode
 elif PY3:
     text = str
-
+INF = float("inf")
 
 def _info(message):
     logging.getLogger("snapshotter").info(message)
@@ -320,7 +320,7 @@ class InconsistentArgumentsError(Exception):
 
     """Exception that's raised if there's a contradiction between inputs.
 
-    Raised if --min-snapshots (default: 3) and --max-snapshots (default: -1)
+    Raised if --min-snapshots (default: 3) and --max-snapshots (default: inf)
     are not set in a consistent way.
 
     """
@@ -349,7 +349,7 @@ def snapshot(source,
              dest,
              debug=False,
              min_snapshots=3,
-             max_snapshots=-1,
+             max_snapshots=INF,
              extra_args=None):
     """Make a new snapshot of source in dest.
 
@@ -394,13 +394,12 @@ def snapshot(source,
     """
     date = _datetime()
     user, host, snapshots_root = _parse_path(dest)
-    if max_snapshots > -1 and max_snapshots - min_snapshots < 0:
+    if max_snapshots - min_snapshots < 0:
         raise InconsistentArgumentsError(
             "--max-snapshots must be greater than --min-snapshots")
-    if max_snapshots > -1 and max_snapshots + 1 - min_snapshots >= 0:
-        snapshots = _ls_snapshots(dest)
-        for i in range(len(snapshots) - max_snapshots + 1):
-            _rm(snapshots[i], user, host, directory=True, debug=debug)
+    while len(_ls_snapshots(dest)) > max_snapshots - 1:
+        _remove_oldest_snapshot(
+            snapshots_root, user, host, min_snapshots=min_snapshots - 1, debug=debug)
     while True:
         try:
             _rsync(source, dest, debug, extra_args)
@@ -441,8 +440,8 @@ def _parse_cli(args=None):
     parser.add_argument(
         '--max-snapshots', type=int, dest='max_snapshots',
         help="The maximum number of snapshots allowed for the backup "
-             " (default: -1)",
-        default=-1)
+             " (default: inf)",
+        default=INF)
 
     try:
         args, extra_args = parser.parse_known_args(args)
