@@ -248,7 +248,6 @@ def _is_remote(path):
 def _parse_path(path):
     """Parse the given local or remote path and return its parts.
 
-
     :param path: a local or remote path as would be used in an rsync SRC or
         DEST argument on the command-line
 
@@ -346,7 +345,12 @@ def _remove_oldest_snapshot(dest, user=None, host=None, min_snapshots=3,
         _rm(oldest_snapshot, user, host, directory=True, debug=debug)
 
 
-def snapshot(source, dest, debug=False, min_snapshots=3, max_snapshots=-1, extra_args=None):
+def snapshot(source,
+             dest,
+             debug=False,
+             min_snapshots=3,
+             max_snapshots=-1,
+             extra_args=None):
     """Make a new snapshot of source in dest.
 
     Make a new snapshot means:
@@ -393,9 +397,9 @@ def snapshot(source, dest, debug=False, min_snapshots=3, max_snapshots=-1, extra
     if max_snapshots > -1 and max_snapshots - min_snapshots < 0:
         raise InconsistentArguments(
             "--max-snapshots must be greater than --min-snapshots")
-    if max_snapshots > -1 and max_snapshots+1 - min_snapshots >= 0:
+    if max_snapshots > -1 and max_snapshots + 1 - min_snapshots >= 0:
         snapshots = _ls_snapshots(dest)
-        for i in range(len(snapshots)-max_snapshots+1):
+        for i in range(len(snapshots) - max_snapshots + 1):
             _rm(snapshots[i], user, host, directory=True, debug=debug)
     while True:
         try:
@@ -406,9 +410,9 @@ def snapshot(source, dest, debug=False, min_snapshots=3, max_snapshots=-1, extra
             _remove_oldest_snapshot(
                 snapshots_root, user, host, min_snapshots=min_snapshots,
                 debug=debug)
-    snapshot = _move_incomplete_dir(snapshots_root, date, user, host, debug)
+    snapshot_ = _move_incomplete_dir(snapshots_root, date, user, host, debug)
     _update_latest_symlink(date, snapshots_root, user, host, debug)
-    _info("Successfully completed snapshot: {path}".format(path=snapshot))
+    _info("Successfully completed snapshot: {path}".format(path=snapshot_))
 
 
 class CommandLineArgumentsError(Exception):
@@ -456,7 +460,12 @@ def _parse_cli(args=None):
         src = args.SRC
         dest = args.DEST
 
-    return (src, dest, args.debug, args.min_snapshots, args.max_snapshots, extra_args)
+    return (src,
+            dest,
+            args.debug,
+            args.min_snapshots,
+            args.max_snapshots,
+            extra_args)
 
 
 def main():
