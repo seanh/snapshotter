@@ -316,7 +316,7 @@ class NoMoreSnapshotsToRemoveError(Exception):
     pass
 
 
-class InconsistentArguments(Exception):
+class InconsistentArgumentsError(Exception):
 
     """Exception that's raised if there's a contradiction between inputs.
 
@@ -395,7 +395,7 @@ def snapshot(source,
     date = _datetime()
     user, host, snapshots_root = _parse_path(dest)
     if max_snapshots > -1 and max_snapshots - min_snapshots < 0:
-        raise InconsistentArguments(
+        raise InconsistentArgumentsError(
             "--max-snapshots must be greater than --min-snapshots")
     if max_snapshots > -1 and max_snapshots + 1 - min_snapshots >= 0:
         snapshots = _ls_snapshots(dest)
@@ -485,5 +485,5 @@ def main():
             message=err.message, command=err.command))
     except CalledProcessError as err:
         sys.exit(err.output)
-    except InconsistentArguments as err:
+    except InconsistentArgumentsError as err:
         sys.exit(err.message)
