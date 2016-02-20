@@ -391,7 +391,8 @@ def snapshot(source, dest, debug=False, min_snapshots=3, max_snapshots=-1, extra
     date = _datetime()
     user, host, snapshots_root = _parse_path(dest)
     if max_snapshots > -1 and max_snapshots - min_snapshots < 0:
-        raise InconsistentArguments
+        raise InconsistentArguments(
+            "--max-snapshots must be greater than --min-snapshots")
     if max_snapshots > -1 and max_snapshots+1 - min_snapshots >= 0:
         snapshots = _ls_snapshots(dest)
         for i in range(len(snapshots)-max_snapshots+1):
@@ -475,3 +476,5 @@ def main():
             message=err.message, command=err.command))
     except CalledProcessError as err:
         sys.exit(err.output)
+    except InconsistentArguments as err:
+        sys.exit(err.message)
