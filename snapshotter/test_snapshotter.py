@@ -125,7 +125,7 @@ class TestCLI(object):
             args=["/home/fred"])
 
     def test_with_default_options(self):
-        src, dest, debug, _, _ = (
+        src, dest, debug, _, _, _ = (
             snapshotter._parse_cli(args=["/home/fred", "/media/backup"]))
         assert src == "/home/fred"
         assert dest == "/media/backup"
@@ -133,12 +133,12 @@ class TestCLI(object):
 
     def test_dry_run(self):
         for option in ("-n", "--dry-run"):
-            _, _, debug, _, _ = snapshotter._parse_cli(
+            _, _, debug, _, _, _ = snapshotter._parse_cli(
                 args=[option, "/home/fred", "/media/backup"])
             assert debug is True
 
     def test_extra_args(self):
-        _, _, _, _, extra_args = (
+        _, _, _, _, _, extra_args = (
             snapshotter._parse_cli(
                 args=["--foo=fred", "-x", "/home/fred", "/media/backup"]))
         assert extra_args == ["--foo=fred", "-x"]
