@@ -442,7 +442,11 @@ def _parse_cli(args=None):
     try:
         args, extra_args = parser.parse_known_args(args)
     except SystemExit as err:
-        raise CommandLineArgumentsError(err.code)
+        if err.code == 0:
+            # This happens when you pass -h or --help.
+            raise
+        else:
+            raise CommandLineArgumentsError(err.code)
 
     try:
         src = text(args.SRC, encoding=STDOUT_ENCODING)
@@ -464,6 +468,10 @@ def main():
     logging.basicConfig(level=logging.INFO)
     try:
         snapshot(*_parse_cli())
-    except (CommandLineArgumentsError, CalledProcessError,
-            NoSuchCommandError) as err:
+    except CommandLineArgumentsError as err:
+        sys.exit(err.message)
+    except NoSuchCommandError as err:
+        sys.exit("{message}: {command}".format(
+            message=err.message, command=err.command))
+    except CalledProcessError as err:
         sys.exit(err.output)
