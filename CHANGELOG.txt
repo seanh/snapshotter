@@ -1,3 +1,7 @@
+1.0.3
+-----
+- Added --max-snapshots option contributed by @Lightjohn
+
 1.0.2
 -----
 - Added Python 3 support
