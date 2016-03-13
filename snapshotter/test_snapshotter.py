@@ -195,9 +195,15 @@ class TestSnapshot(object):
         self.datetime = "2015-02-23T18_58_02"
         self.mock_datetime_function.return_value = self.datetime
 
+        self.ls_snapshots_patcher = mock.patch(
+            'snapshotter.snapshotter._ls_snapshots')
+        self.mock_ls_snapshots_function = self.ls_snapshots_patcher.start()
+        self.mock_ls_snapshots_function.return_value = []
+
     def teardown(self):
         self.run_patcher.stop()
         self.datetime_patcher.stop()
+        self.ls_snapshots_patcher.stop()
 
     def test_passing_dry_run_to_rsync(self):
         """snapshot() should pass -n/--dry-run on to rsync."""
