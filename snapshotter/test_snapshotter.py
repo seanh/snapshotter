@@ -222,12 +222,16 @@ class TestSnapshot(object):
         except snapshotter.InconsistentArgumentsError:
             pass
 
-    def test_it_does_not_raise_if_max_snapshots_equals_min_snapshots(self):
-        snapshotter.snapshot(
-            "/home/fred",
-            "/media/backup",
-            min_snapshots=5,
-            max_snapshots=5)
+    def test_it_raises_if_max_snapshots_equals_min_snapshots(self):
+        try:
+            snapshotter.snapshot(
+                "/home/fred",
+                "/media/backup",
+                min_snapshots=5,
+                max_snapshots=5)
+            assert False, "snapshot() should have raised an exception"
+        except snapshotter.InconsistentArgumentsError:
+            pass
 
     def test_it_does_not_raise_if_min_snapshots_less_than_max_snapshots(self):
         snapshotter.snapshot(
@@ -247,9 +251,9 @@ class TestSnapshot(object):
         snapshotter.snapshot(
             "/home/fred",
             "/media/backup",
-            max_snapshots=3)
+            max_snapshots=4)
 
-        assert self.mock_remove_oldest_snapshot_function.call_count == 3
+        assert self.mock_remove_oldest_snapshot_function.call_count == 2
 
     def test_passing_dry_run_to_rsync(self):
         """snapshot() should pass -n/--dry-run on to rsync."""

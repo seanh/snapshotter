@@ -393,7 +393,7 @@ def snapshot(source,
     date = _datetime()
     user, host, snapshots_root = _parse_path(dest)
 
-    if max_snapshots < min_snapshots:
+    if max_snapshots <= min_snapshots:
         raise InconsistentArgumentsError(
             "--max-snapshots must be greater than --min-snapshots")
 
