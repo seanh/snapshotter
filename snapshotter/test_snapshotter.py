@@ -125,7 +125,7 @@ class TestCLI(object):
             args=["/home/fred"])
 
     def test_with_default_options(self):
-        src, dest, debug, _, _ = (
+        src, dest, debug, _, _, _ = (
             snapshotter._parse_cli(args=["/home/fred", "/media/backup"]))
         assert src == "/home/fred"
         assert dest == "/media/backup"
@@ -133,12 +133,12 @@ class TestCLI(object):
 
     def test_dry_run(self):
         for option in ("-n", "--dry-run"):
-            _, _, debug, _, _ = snapshotter._parse_cli(
+            _, _, debug, _, _, _ = snapshotter._parse_cli(
                 args=[option, "/home/fred", "/media/backup"])
             assert debug is True
 
     def test_extra_args(self):
-        _, _, _, _, extra_args = (
+        _, _, _, _, _, extra_args = (
             snapshotter._parse_cli(
                 args=["--foo=fred", "-x", "/home/fred", "/media/backup"]))
         assert extra_args == ["--foo=fred", "-x"]
@@ -195,9 +195,65 @@ class TestSnapshot(object):
         self.datetime = "2015-02-23T18_58_02"
         self.mock_datetime_function.return_value = self.datetime
 
+        self.ls_snapshots_patcher = mock.patch(
+            'snapshotter.snapshotter._ls_snapshots')
+        self.mock_ls_snapshots_function = self.ls_snapshots_patcher.start()
+        self.mock_ls_snapshots_function.return_value = []
+
+        self.remove_oldest_snapshot_patcher = mock.patch(
+            'snapshotter.snapshotter._remove_oldest_snapshot')
+        self.mock_remove_oldest_snapshot_function = (
+            self.remove_oldest_snapshot_patcher.start())
+
     def teardown(self):
         self.run_patcher.stop()
         self.datetime_patcher.stop()
+        self.ls_snapshots_patcher.stop()
+        self.remove_oldest_snapshot_patcher.stop()
+
+    def test_it_raises_if_min_snapshots_greater_than_max_snapshots(self):
+        try:
+            snapshotter.snapshot(
+                "/home/fred",
+                "/media/backup",
+                min_snapshots=5,
+                max_snapshots=4)
+            assert False, "snapshot() should have raised an exception"
+        except snapshotter.InconsistentArgumentsError:
+            pass
+
+    def test_it_raises_if_max_snapshots_equals_min_snapshots(self):
+        try:
+            snapshotter.snapshot(
+                "/home/fred",
+                "/media/backup",
+                min_snapshots=5,
+                max_snapshots=5)
+            assert False, "snapshot() should have raised an exception"
+        except snapshotter.InconsistentArgumentsError:
+            pass
+
+    def test_it_does_not_raise_if_min_snapshots_less_than_max_snapshots(self):
+        snapshotter.snapshot(
+            "/home/fred",
+            "/media/backup",
+            min_snapshots=4,
+            max_snapshots=5)
+
+    def test_it_removes_oldest_snapshots_when_more_than_max_snapshots(self):
+        snapshots = ["first", "second", "third", "fourth", "fifth"]
+        self.mock_ls_snapshots_function.return_value = snapshots
+        def remove_oldest_snapshot(*args, **kwargs):
+             snapshots.pop()
+        self.mock_remove_oldest_snapshot_function.side_effect = (
+            remove_oldest_snapshot)
+
+        snapshotter.snapshot(
+            "/home/fred",
+            "/media/backup",
+            max_snapshots=4)
+
+        assert self.mock_remove_oldest_snapshot_function.call_count == 2
 
     def test_passing_dry_run_to_rsync(self):
         """snapshot() should pass -n/--dry-run on to rsync."""

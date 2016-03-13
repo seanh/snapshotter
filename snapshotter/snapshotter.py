@@ -26,6 +26,9 @@ elif PY3:
     text = str
 
 
+INF = float("inf")
+
+
 def _info(message):
     logging.getLogger("snapshotter").info(message)
 
@@ -248,7 +251,6 @@ def _is_remote(path):
 def _parse_path(path):
     """Parse the given local or remote path and return its parts.
 
-
     :param path: a local or remote path as would be used in an rsync SRC or
         DEST argument on the command-line
 
@@ -317,6 +319,13 @@ class NoMoreSnapshotsToRemoveError(Exception):
     pass
 
 
+class InconsistentArgumentsError(Exception):
+
+    """Exception that's raised if there's a contradiction between inputs."""
+
+    pass
+
+
 def _remove_oldest_snapshot(dest, user=None, host=None, min_snapshots=3,
                             debug=False):
     """Remove the oldest snapshot directory from dest.
@@ -334,7 +343,12 @@ def _remove_oldest_snapshot(dest, user=None, host=None, min_snapshots=3,
         _rm(oldest_snapshot, user, host, directory=True, debug=debug)
 
 
-def snapshot(source, dest, debug=False, min_snapshots=3, extra_args=None):
+def snapshot(source,
+             dest,
+             debug=False,
+             min_snapshots=3,
+             max_snapshots=INF,
+             extra_args=None):
     """Make a new snapshot of source in dest.
 
     Make a new snapshot means:
@@ -378,6 +392,15 @@ def snapshot(source, dest, debug=False, min_snapshots=3, extra_args=None):
     """
     date = _datetime()
     user, host, snapshots_root = _parse_path(dest)
+
+    if max_snapshots <= min_snapshots:
+        raise InconsistentArgumentsError(
+            "--max-snapshots must be greater than --min-snapshots")
+
+    while len(_ls_snapshots(dest)) >= max_snapshots:
+        _remove_oldest_snapshot(
+            snapshots_root, user, host, min_snapshots=min_snapshots - 1, debug=debug)
+
     while True:
         try:
             _rsync(source, dest, debug, extra_args)
@@ -387,9 +410,9 @@ def snapshot(source, dest, debug=False, min_snapshots=3, extra_args=None):
             _remove_oldest_snapshot(
                 snapshots_root, user, host, min_snapshots=min_snapshots,
                 debug=debug)
-    snapshot = _move_incomplete_dir(snapshots_root, date, user, host, debug)
+    snapshot_ = _move_incomplete_dir(snapshots_root, date, user, host, debug)
     _update_latest_symlink(date, snapshots_root, user, host, debug)
-    _info("Successfully completed snapshot: {path}".format(path=snapshot))
+    _info("Successfully completed snapshot: {path}".format(path=snapshot_))
 
 
 class CommandLineArgumentsError(Exception):
@@ -415,11 +438,20 @@ def _parse_cli(args=None):
         help="The minimum number of snapshots to leave behind when rolling "
              "out old snapshots to make space for new ones (default: 3)",
         default=3)
+    parser.add_argument(
+        '--max-snapshots', type=int, dest='max_snapshots',
+        help="The maximum number of snapshots allowed for the backup "
+             " (default: inf)",
+        default=INF)
 
     try:
         args, extra_args = parser.parse_known_args(args)
     except SystemExit as err:
-        raise CommandLineArgumentsError(err.code)
+        if err.code == 0:
+            # This happens when you pass -h or --help.
+            raise
+        else:
+            raise CommandLineArgumentsError(err.code)
 
     try:
         src = text(args.SRC, encoding=STDOUT_ENCODING)
@@ -428,7 +460,12 @@ def _parse_cli(args=None):
         src = args.SRC
         dest = args.DEST
 
-    return (src, dest, args.debug, args.min_snapshots, extra_args)
+    return (src,
+            dest,
+            args.debug,
+            args.min_snapshots,
+            args.max_snapshots,
+            extra_args)
 
 
 def main():
@@ -441,6 +478,12 @@ def main():
     logging.basicConfig(level=logging.INFO)
     try:
         snapshot(*_parse_cli())
-    except (CommandLineArgumentsError, CalledProcessError,
-            NoSuchCommandError) as err:
+    except CommandLineArgumentsError as err:
+        sys.exit(err.message)
+    except NoSuchCommandError as err:
+        sys.exit("{message}: {command}".format(
+            message=err.message, command=err.command))
+    except CalledProcessError as err:
         sys.exit(err.output)
+    except InconsistentArgumentsError as err:
+        sys.exit(err.message)
