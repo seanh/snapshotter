@@ -321,12 +321,7 @@ class NoMoreSnapshotsToRemoveError(Exception):
 
 class InconsistentArgumentsError(Exception):
 
-    """Exception that's raised if there's a contradiction between inputs.
-
-    Raised if --min-snapshots (default: 3) and --max-snapshots (default: inf)
-    are not set in a consistent way.
-
-    """
+    """Exception that's raised if there's a contradiction between inputs."""
 
     pass
 
