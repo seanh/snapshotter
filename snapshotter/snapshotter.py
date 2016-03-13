@@ -24,7 +24,10 @@ if PY2:
     text = unicode
 elif PY3:
     text = str
+
+
 INF = float("inf")
+
 
 def _info(message):
     logging.getLogger("snapshotter").info(message)
