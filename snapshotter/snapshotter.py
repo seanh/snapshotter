@@ -397,7 +397,7 @@ def snapshot(source,
         raise InconsistentArgumentsError(
             "--max-snapshots must be greater than --min-snapshots")
 
-    while len(_ls_snapshots(dest)) > max_snapshots - 1:
+    while len(_ls_snapshots(dest)) >= max_snapshots:
         _remove_oldest_snapshot(
             snapshots_root, user, host, min_snapshots=min_snapshots - 1, debug=debug)
 
