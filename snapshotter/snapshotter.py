@@ -392,12 +392,15 @@ def snapshot(source,
     """
     date = _datetime()
     user, host, snapshots_root = _parse_path(dest)
-    if max_snapshots - min_snapshots < 0:
+
+    if max_snapshots < min_snapshots:
         raise InconsistentArgumentsError(
             "--max-snapshots must be greater than --min-snapshots")
+
     while len(_ls_snapshots(dest)) > max_snapshots - 1:
         _remove_oldest_snapshot(
             snapshots_root, user, host, min_snapshots=min_snapshots - 1, debug=debug)
+
     while True:
         try:
             _rsync(source, dest, debug, extra_args)
