@@ -292,7 +292,7 @@ def _parse_path(path):
     return user, host, path
 
 
-def _ls_snapshots(dest):
+def _ls_snapshots(dest, debug=False):
     """Return a sorted list of the snapshot directories in directory dest.
 
     Snapshots are sorted oldest-first, going by the date in their
@@ -300,9 +300,29 @@ def _ls_snapshots(dest):
 
     """
     pattern = "[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}_[0-9]{2}_[0-9]{2}.snapshot"
-    snapshots = [os.path.join(dest, d) for d in os.listdir(dest)
-                 if os.path.isdir(os.path.join(dest, d)) and
-                 re.match(pattern, d)]
+    dirlst = []
+
+    if _is_remote(dest):
+        user, host, snapshots_root = _parse_path(dest)
+        ls_cmd = _wrap_in_ssh(["ls", "-d", snapshots_root + "/*/"], user, host)
+        dirent = _run(ls_cmd, debug=debug)
+        rdirs = filter(None, dirent.split('\n'))
+        for d in rdirs:
+            d = d[:-1]
+            d = d.rsplit('/', 1)
+            dirlst.append(d[1])
+
+        destdir = snapshots_root
+    else:
+        for d in os.listdir(dest):
+            if os.path.isdir(os.path.join(dest, d)):
+                dirlst.append(d)
+
+        destdir = dest
+
+    snapshots = [os.path.join(destdir, d) for d in dirlst
+                 if re.match(pattern, d)]
+
     return sorted(snapshots)
 
 
@@ -334,7 +354,7 @@ def _remove_oldest_snapshot(dest, user=None, host=None, min_snapshots=3,
     less than or equal to min_snapshots.
 
     """
-    snapshots = _ls_snapshots(dest)
+    snapshots = _ls_snapshots(dest, debug=debug)
     if len(snapshots) <= min_snapshots:
         raise NoMoreSnapshotsToRemoveError
     else:
@@ -399,7 +419,7 @@ def snapshot(source,
 
     while len(_ls_snapshots(dest)) >= max_snapshots:
         _remove_oldest_snapshot(
-            snapshots_root, user, host, min_snapshots=min_snapshots - 1, debug=debug)
+            dest, user, host, min_snapshots=min_snapshots - 1, debug=debug)
 
     while True:
         try:
@@ -408,8 +428,7 @@ def snapshot(source,
         except NoSpaceLeftOnDeviceError as err:
             _info(err)
             _remove_oldest_snapshot(
-                snapshots_root, user, host, min_snapshots=min_snapshots,
-                debug=debug)
+                dest, user, host, min_snapshots=min_snapshots, debug=debug)
     snapshot_ = _move_incomplete_dir(snapshots_root, date, user, host, debug)
     _update_latest_symlink(date, snapshots_root, user, host, debug)
     _info("Successfully completed snapshot: {path}".format(path=snapshot_))
