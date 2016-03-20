@@ -299,28 +299,31 @@ def _ls_snapshots(dest, debug=False):
     YYYY-MM-DDTHH_MM_SS.snapshot filename.
 
     """
-    pattern = "[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}_[0-9]{2}_[0-9]{2}.snapshot"
-    dirlst = []
+    pattern = "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}_[0-9]{2}_[0-9]{2}.snapshot$"
+    directories = []
 
     if _is_remote(dest):
-        user, host, snapshots_root = _parse_path(dest)
-        ls_cmd = _wrap_in_ssh(["ls", "-d", snapshots_root + "/*/"], user, host)
-        dirent = _run(ls_cmd, debug=debug)
-        rdirs = filter(None, dirent.split('\n'))
-        for d in rdirs:
-            d = d[:-1]
-            d = d.rsplit('/', 1)
-            dirlst.append(d[1])
 
-        destdir = snapshots_root
+        # Notice that we're overwriting the value of `dest` here,
+        # removing the user and host parts from it.
+        user, host, dest = _parse_path(dest)
+
+        # FIXME: This will list files and directories, it should really list
+        # directories only (although the chances of files named like
+        # YYYY-MM-DDTHH_MM_SS.snapshot in the destination directory seems low.)
+        output = _run(
+            _wrap_in_ssh(["ls", dest], user, host),
+            debug=debug)
+        directories.extend([
+            d for d in output.split('\n') if d
+        ])
+
     else:
-        for d in os.listdir(dest):
-            if os.path.isdir(os.path.join(dest, d)):
-                dirlst.append(d)
+        for directory in os.listdir(dest):
+            if os.path.isdir(os.path.join(dest, directory)):
+                directories.append(directory)
 
-        destdir = dest
-
-    snapshots = [os.path.join(destdir, d) for d in dirlst
+    snapshots = [os.path.join(dest, d) for d in directories
                  if re.match(pattern, d)]
 
     return sorted(snapshots)
