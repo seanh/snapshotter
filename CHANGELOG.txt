@@ -1,7 +1,19 @@
+1.0.4
+-----
+- Fix a crash when backing up to a remote host,
+  fix contributed by Glenn Lagasse (@glennlagasse)
+
+
+1.0.3
+-----
+- Added --max-snapshots option, contributed by @Lightjohn
+
+
 1.0.2
 -----
-- Added Python 3 support
+- Added Python 3 support, contributed by Frank Sachsenheim (@funkyfuture)
 - Fixed error with non-ASCII characters in SRC or DEST
+
 
 1.0.1
 -----
