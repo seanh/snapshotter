@@ -45,7 +45,7 @@ class TestLsSnapshots(object):
         snapshotter._ls_snapshots("seanh@192.168.1.92:notes.backup")
 
         self.mock_run_function.assert_called_once_with(
-            [u'ssh', u'seanh@192.168.1.92', u'ls', u'notes.backup'])
+            ['ssh', 'seanh@192.168.1.92', 'ls', 'notes.backup'])
 
     def test_it_returns_snapshots_from_remote_dests(self):
         self.mock_run_function.return_value = (
