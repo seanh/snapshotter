@@ -18,6 +18,130 @@ def _this_directory():
     return os.path.split(sys.modules[__name__].__file__)[0]
 
 
+class TestLsSnapshots(object):
+
+    """Unit tests for _ls_snapshots()."""
+
+    def setup(self):
+        """Patch the _run() and _datetime() functions."""
+        self.run_patcher = mock.patch('snapshotter.snapshotter._run')
+        self.mock_run_function = self.run_patcher.start()
+        self.mock_run_function.return_value = ""
+
+        self.os_patcher = mock.patch('snapshotter.snapshotter.os',
+                                     autospec=True)
+        self.mock_os_module = self.os_patcher.start()
+        self.mock_os_module.sep = "/"
+        self.mock_os_module.listdir.return_value = []
+        self.mock_os_module.path.isdir.return_value = True
+        self.mock_os_module.path.join.side_effect = os.path.join
+        self.mock_os_module.path.abspath.side_effect = os.path.abspath
+
+    def teardown(self):
+        self.run_patcher.stop()
+        self.os_patcher.stop()
+
+    def test_it_calls_run_correctly_when_dest_is_remote(self):
+        snapshotter._ls_snapshots("seanh@192.168.1.92:notes.backup")
+
+        self.mock_run_function.assert_called_once_with(
+            [u'ssh', u'seanh@192.168.1.92', u'ls', u'notes.backup'],
+            debug=False)
+
+    def test_it_passes_debug_to_run(self):
+        snapshotter._ls_snapshots(
+            "seanh@192.168.1.92:notes.backup",
+            debug=True
+        )
+
+        assert self.mock_run_function.call_args[1]['debug'] is True
+
+    def test_it_returns_snapshots_from_remote_dests(self):
+        self.mock_run_function.return_value = (
+            "2016-03-20T13_19_25.snapshot\n"
+            "2016-03-20T13_20_11.snapshot\n"
+            "latest.snapshot\n"
+        )
+
+        snapshots = snapshotter._ls_snapshots(
+            "seanh@192.168.1.92:notes.backup")
+
+        assert set(snapshots) == set([
+            "notes.backup/2016-03-20T13_19_25.snapshot",
+            "notes.backup/2016-03-20T13_20_11.snapshot"])
+
+    def test_it_does_not_return_non_snapshot_directories_from_remote_dests(self):
+        self.mock_run_function.return_value = (
+            "some other directory\n"
+            "2016-03-20T13_20_11.snapshot\n"
+            "latest.snapshot\n"
+        )
+
+        snapshots = snapshotter._ls_snapshots(
+            "seanh@192.168.1.92:notes.backup")
+
+        for snapshot in snapshots:
+            assert "some other directory" not in snapshot
+
+    def test_it_calls_os_listdir_correctly(self):
+        snapshots = snapshotter._ls_snapshots("/home/seanh/Music")
+
+        self.mock_os_module.listdir.assert_called_once_with(
+            "/home/seanh/Music")
+
+    def test_it_returns_snapshots_from_local_dests(self):
+        self.mock_os_module.listdir.return_value = [
+            "2016-03-20T13_19_25.snapshot",
+            "2016-03-20T13_20_11.snapshot",
+            "latest.snapshot",
+        ]
+
+        snapshots = snapshotter._ls_snapshots("/home/seanh/Music")
+
+        assert set(snapshots) == set([
+            "/home/seanh/Music/2016-03-20T13_19_25.snapshot",
+            "/home/seanh/Music/2016-03-20T13_20_11.snapshot"])
+
+    def test_it_does_not_return_non_directories_from_local_dests(self):
+        self.mock_os_module.listdir.return_value = [
+            "a_file",
+            "another_file",
+            "latest.snapshot",
+        ]
+        self.mock_os_module.path.isdir.return_value = False
+
+        assert snapshotter._ls_snapshots("/home/seanh/Music") == []
+
+    def test_it_does_not_return_non_snapshot_directories_from_local_dests(self):
+        self.mock_os_module.listdir.return_value = [
+            "2016-03-20T13_19_25.snapshot",
+            "some other directory",
+            "2016-03-20T13_20_11.snapshot",
+            "latest.snapshot",
+        ]
+
+        snapshots = snapshotter._ls_snapshots("/home/seanh/Music")
+
+        for snapshot in snapshots:
+            assert "some other directory" not in snapshot
+
+    def test_it_returns_snapshots_in_oldest_first_order(self):
+        self.mock_os_module.listdir.return_value = [
+            "2016-03-20T13_19_25.snapshot",
+            "2016-03-20T13_20_11.snapshot",
+            "2016-03-20T13_21_11.snapshot",
+            "latest.snapshot",
+        ]
+
+        snapshots = snapshotter._ls_snapshots("/home/seanh/Music")
+
+        assert snapshots == [
+            "/home/seanh/Music/2016-03-20T13_19_25.snapshot",
+            "/home/seanh/Music/2016-03-20T13_20_11.snapshot",
+            "/home/seanh/Music/2016-03-20T13_21_11.snapshot",
+        ]
+
+
 class TestRun(object):
 
     """Unit tests for the _run() function."""
