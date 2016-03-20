@@ -292,7 +292,7 @@ def _parse_path(path):
     return user, host, path
 
 
-def _ls_snapshots(dest, debug=False):
+def _ls_snapshots(dest):
     """Return a sorted list of the snapshot directories in directory dest.
 
     Snapshots are sorted oldest-first, going by the date in their
@@ -311,9 +311,7 @@ def _ls_snapshots(dest, debug=False):
         # FIXME: This will list files and directories, it should really list
         # directories only (although the chances of files named like
         # YYYY-MM-DDTHH_MM_SS.snapshot in the destination directory seems low.)
-        output = _run(
-            _wrap_in_ssh(["ls", dest], user, host),
-            debug=debug)
+        output = _run(_wrap_in_ssh(["ls", dest], user, host))
         directories.extend([
             d for d in output.split('\n') if d
         ])
@@ -357,7 +355,7 @@ def _remove_oldest_snapshot(dest, user=None, host=None, min_snapshots=3,
     less than or equal to min_snapshots.
 
     """
-    snapshots = _ls_snapshots(dest, debug=debug)
+    snapshots = _ls_snapshots(dest)
     if len(snapshots) <= min_snapshots:
         raise NoMoreSnapshotsToRemoveError
     else:
