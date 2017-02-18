@@ -119,8 +119,6 @@ def _rsync(source, dest, debug=False, extra_args=None):
         # Make hard-links to the previous snapshot, if any.
         '--link-dest=../latest.snapshot',
         '--human-readable',  # Output numbers in a human-readable format.
-        '--quiet',  # Suppress non-error output messages.
-        '--compress',  # Compress files during transfer.
         '--fuzzy',  # Look for basis files for any missing destination files.
     ]
 
