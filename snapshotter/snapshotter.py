@@ -143,6 +143,9 @@ def _rsync(source, dest, debug=False, extra_args=None):
     except CalledProcessError as err:
         if err.exit_value == 11 and "No space left on device (28)" in err.output:
             raise NoSpaceLeftOnDeviceError(err.output)
+        elif err.exit_value ==  24:
+            # Partial transfer due to vanished source files.
+            pass
         else:
             raise
 
