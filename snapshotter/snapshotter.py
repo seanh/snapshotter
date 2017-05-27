@@ -141,7 +141,7 @@ def _rsync(source, dest, debug=False, extra_args=None):
     try:
         _run(rsync_cmd)
     except CalledProcessError as err:
-        if err.exit_value == 11 and "No space left on device" in err.output:
+        if err.exit_value == 11 and "No space left on device (28)" in err.output:
             raise NoSpaceLeftOnDeviceError(err.output)
         else:
             raise
